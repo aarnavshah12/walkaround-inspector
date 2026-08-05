@@ -4,7 +4,7 @@
 // 3161 request runs inline with a short timeout; on failure the token is
 // marked pending and retried on later status reads.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import type { CaptureCreateRequest, CaptureRecord } from "../../../lib/types";
 import { newCaptureId, writeCapture, updateCapture } from "../../../lib/server/store";
 import { requestTimestamp } from "../../../lib/server/tsa";
@@ -53,15 +53,19 @@ export async function POST(req: NextRequest) {
   };
   await writeCapture(record);
 
-  // Inline TSA attempt — bounded by TSA_TIMEOUT_MS so the response stays
-  // within the "2 s after record-stop" budget even when the TSA is down.
-  const tsa = await requestTimestamp(record.id, record.hash);
-  const updated = await updateCapture(record.id, (r) => ({
-    ...r,
-    tsa: tsa.ok
-      ? { ...r.tsa, status: "granted", grantedAt: new Date().toISOString(), lastAttemptAt: new Date().toISOString() }
-      : { ...r.tsa, status: "pending", error: tsa.error, lastAttemptAt: new Date().toISOString() },
-  }));
+  // The response must beat the "2 s after record-stop" budget on bad signal,
+  // so the TSA round-trip runs after the response is sent. serverTime above
+  // is authoritative either way; the token lands seconds later and the
+  // status GET picks it up (and retries if this attempt fails).
+  after(async () => {
+    const tsa = await requestTimestamp(record.id, record.hash);
+    await updateCapture(record.id, (r) => ({
+      ...r,
+      tsa: tsa.ok
+        ? { ...r.tsa, status: "granted", grantedAt: new Date().toISOString(), lastAttemptAt: new Date().toISOString() }
+        : { ...r.tsa, status: "pending", error: tsa.error, lastAttemptAt: new Date().toISOString() },
+    }));
+  });
 
-  return NextResponse.json(updated ?? record, { status: 201 });
+  return NextResponse.json(record, { status: 201 });
 }

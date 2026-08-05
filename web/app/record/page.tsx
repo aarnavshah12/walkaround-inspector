@@ -10,9 +10,13 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COACH_SEGMENTS, MIN_HEIGHT_PX, MIN_WALKAROUND_MS } from "../../lib/coach";
 import { sha256Hex } from "../../lib/hash";
-import { savePendingVideo } from "../../lib/blob-store";
+import {
+  deletePendingVideo,
+  savePendingVideo,
+  type PendingVideo,
+} from "../../lib/blob-store";
 import { registerCapture } from "../../lib/capture-client";
-import type { SegmentMark } from "../../lib/types";
+import type { CaptureCreateRequest, SegmentMark } from "../../lib/types";
 
 const MIME_CANDIDATES = [
   "video/mp4;codecs=avc1", // iOS Safari
@@ -33,8 +37,10 @@ type Phase =
   | "done"
   | "error";
 
+const FINALIZE_STEPS = ["saving", "hashing", "timestamping", "secured"] as const;
+
 interface FinalizeState {
-  step: "saving" | "hashing" | "timestamping" | "secured";
+  step: (typeof FINALIZE_STEPS)[number];
   warnings: string[];
   captureId?: string;
 }
@@ -57,6 +63,7 @@ export default function RecordPage() {
   const segMarksRef = useRef<SegmentMark[]>([]);
   const motionRef = useRef<number[]>([]);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const visHandlerRef = useRef<(() => void) | null>(null);
   const trackSizeRef = useRef<{ width?: number; height?: number }>({});
 
   // Live UI clock while recording.
@@ -71,6 +78,9 @@ export default function RecordPage() {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       wakeLockRef.current?.release().catch(() => {});
+      if (visHandlerRef.current) {
+        document.removeEventListener("visibilitychange", visHandlerRef.current);
+      }
     };
   }, []);
 
@@ -116,12 +126,21 @@ export default function RecordPage() {
     motionRef.current = [];
     window.addEventListener("devicemotion", onMotion);
 
-    try {
-      const wl = (navigator as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock;
-      if (wl) wakeLockRef.current = await wl.request("screen");
-    } catch {
-      /* screen may sleep; recording continues */
-    }
+    const acquireWakeLock = async () => {
+      try {
+        const wl = (navigator as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+        if (wl) wakeLockRef.current = await wl.request("screen");
+      } catch {
+        /* screen may sleep; recording continues */
+      }
+    };
+    await acquireWakeLock();
+    // Wake locks auto-release when the tab is backgrounded — re-acquire on
+    // return so a long recording doesn't lose the screen mid-lap.
+    visHandlerRef.current = () => {
+      if (document.visibilityState === "visible") void acquireWakeLock();
+    };
+    document.addEventListener("visibilitychange", visHandlerRef.current);
 
     const mime = MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
     mimeRef.current = mime || "video/webm";
@@ -172,6 +191,10 @@ export default function RecordPage() {
 
   function stopRecording() {
     window.removeEventListener("devicemotion", onMotion);
+    if (visHandlerRef.current) {
+      document.removeEventListener("visibilitychange", visHandlerRef.current);
+      visHandlerRef.current = null;
+    }
     wakeLockRef.current?.release().catch(() => {});
     wakeLockRef.current = null;
     setPhase("finalizing");
@@ -202,40 +225,56 @@ export default function RecordPage() {
       warnings.push(`Walkaround incomplete — ${segMarksRef.current.length} of ${COACH_SEGMENTS.length} areas covered.`);
     }
 
+    const clientTime = new Date().toISOString();
+    const localId = `local-${crypto.randomUUID()}`;
+    const meta: CaptureCreateRequest = {
+      hash: "",
+      clientTime,
+      source: "recorded",
+      mime: blob.type,
+      durationMs,
+      sizeBytes: blob.size,
+      segments: segMarksRef.current,
+      quality: { ...trackSizeRef.current, warnings },
+    };
+    const local: PendingVideo = {
+      captureId: localId,
+      blob,
+      mime: blob.type,
+      size: blob.size,
+      createdAt: clientTime,
+      source: "recorded",
+      registered: false,
+      meta,
+    };
+
     try {
+      // 1. Blob safe on-device FIRST — every later step can fail or stall
+      // (dead signal at the lot) without losing the evidence. The home
+      // screen can replay registration from the stored meta.
+      setFinalize({ step: "saving", warnings });
+      await savePendingVideo(local);
+
+      // 2. Fingerprint, persisted alongside the blob.
       setFinalize({ step: "hashing", warnings });
-      const hash = await sha256Hex(blob);
-      const clientTime = new Date().toISOString();
+      meta.hash = await sha256Hex(blob);
+      await savePendingVideo({ ...local, meta });
 
+      // 3. The tiny hash-timestamp POST — retries until connectivity allows.
       setFinalize({ step: "timestamping", warnings });
-      // Retries until connectivity allows — the tiny POST is the part that
-      // must land; the blob is safe locally regardless.
-      const record = await registerCapture({
-        hash,
-        clientTime,
-        source: "recorded",
-        mime: blob.type,
-        durationMs,
-        sizeBytes: blob.size,
-        segments: segMarksRef.current,
-        quality: { ...trackSizeRef.current, warnings },
-      });
+      const record = await registerCapture(meta);
 
-      setFinalize({ step: "saving", warnings, captureId: record.id });
-      await savePendingVideo({
-        captureId: record.id,
-        blob,
-        mime: blob.type,
-        size: blob.size,
-        createdAt: clientTime,
-        source: "recorded",
-      });
+      // 4. Re-key the local entry to the server capture id.
+      await savePendingVideo({ ...local, captureId: record.id, registered: true, meta });
+      await deletePendingVideo(localId);
 
       setFinalize({ step: "secured", warnings, captureId: record.id });
       setPhase("done");
       if (warnings.length === 0) router.push(`/report/${record.id}`);
     } catch (err) {
-      setErrorMsg(`Could not secure the recording: ${(err as Error).message}`);
+      setErrorMsg(
+        `Could not secure the recording: ${(err as Error).message}. If the video was saved, it appears on the home screen for another try.`
+      );
       setPhase("error");
     }
   }
@@ -324,9 +363,22 @@ export default function RecordPage() {
       {(phase === "finalizing" || phase === "done") && finalize && (
         <section className="card">
           <h2>Securing your evidence</h2>
-          <FinalizeRow label="Video saved on this device" done={finalize.step !== "hashing"} active={finalize.step === "saving"} />
-          <FinalizeRow label="Fingerprint (SHA-256) computed" done={["timestamping", "saving", "secured"].includes(finalize.step)} active={finalize.step === "hashing"} />
-          <FinalizeRow label="Fingerprint timestamped" done={["saving", "secured"].includes(finalize.step)} active={finalize.step === "timestamping"} />
+          {(() => {
+            const idx = FINALIZE_STEPS.indexOf(finalize.step);
+            return (
+              <>
+                <FinalizeRow label="Video saved on this device" done={idx > 0} active={idx === 0} />
+                <FinalizeRow label="Fingerprint (SHA-256) computed" done={idx > 1} active={idx === 1} />
+                <FinalizeRow label="Fingerprint timestamped" done={idx > 2} active={idx === 2} />
+              </>
+            );
+          })()}
+          {finalize.step === "timestamping" && (
+            <p className="muted">
+              Needs a moment of signal — your video is already safe on this
+              device. If you close the app, finish from the home screen later.
+            </p>
+          )}
           {finalize.warnings.length > 0 && (
             <div>
               {finalize.warnings.map((w) => (

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { sha256Hex } from "../../lib/hash";
 import { savePendingVideo } from "../../lib/blob-store";
 import { registerCapture } from "../../lib/capture-client";
+import { MIN_HEIGHT_PX, MIN_WALKAROUND_MS } from "../../lib/coach";
 
 type Step = "idle" | "probing" | "hashing" | "registering" | "error";
 
@@ -27,6 +28,14 @@ export default function LibraryUploadPage() {
       setStep("hashing");
       const hash = await sha256Hex(file);
 
+      const warnings: string[] = [];
+      if (probe.durationMs !== undefined && probe.durationMs < MIN_WALKAROUND_MS) {
+        warnings.push("Short video — a slow, full lap (45 s+) catches far more.");
+      }
+      if (probe.height !== undefined && probe.height < MIN_HEIGHT_PX) {
+        warnings.push(`Low resolution (${probe.height}p) — small scratches may not be visible.`);
+      }
+
       setStep("registering");
       const record = await registerCapture({
         hash,
@@ -35,7 +44,7 @@ export default function LibraryUploadPage() {
         mime: file.type || "video/mp4",
         durationMs: probe.durationMs,
         sizeBytes: file.size,
-        quality: { width: probe.width, height: probe.height, warnings: [] },
+        quality: { width: probe.width, height: probe.height, warnings },
       });
 
       await savePendingVideo({

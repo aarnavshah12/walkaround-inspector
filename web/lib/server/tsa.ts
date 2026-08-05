@@ -36,10 +36,13 @@ function tlv(tag: number, content: Buffer): Buffer {
   return Buffer.concat([Buffer.from([tag]), derLength(content.length), content]);
 }
 
-/** Positive INTEGER encoding (leading zero when the high bit is set). */
+/** Positive INTEGER, minimal DER: strip leading zero bytes, then pad one
+ * back only if the high bit would read as a sign bit. */
 function derInteger(value: Buffer): Buffer {
-  const needsPad = value.length === 0 || value[0] >= 0x80;
-  return tlv(0x02, needsPad ? Buffer.concat([Buffer.from([0]), value]) : value);
+  let v = value;
+  while (v.length > 1 && v[0] === 0x00) v = v.subarray(1);
+  const needsPad = v.length === 0 || v[0] >= 0x80;
+  return tlv(0x02, needsPad ? Buffer.concat([Buffer.from([0]), v]) : v);
 }
 
 // OID 2.16.840.1.101.3.4.2.1 (sha256)

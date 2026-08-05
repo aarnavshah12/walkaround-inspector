@@ -4,16 +4,33 @@
 // upload an existing video from the library.
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { listPendingVideos, type PendingVideo } from "../lib/blob-store";
+import { recoverPendingVideo } from "../lib/capture-client";
 
 export default function HomePage() {
+  const router = useRouter();
   const [pending, setPending] = useState<PendingVideo[]>([]);
+  const [recovering, setRecovering] = useState<string | null>(null);
+  const [recoverError, setRecoverError] = useState("");
 
   useEffect(() => {
     listPendingVideos()
       .then(setPending)
       .catch(() => {});
   }, []);
+
+  async function finishSecuring(p: PendingVideo) {
+    setRecovering(p.captureId);
+    setRecoverError("");
+    try {
+      const serverId = await recoverPendingVideo(p);
+      router.push(`/report/${serverId}`);
+    } catch (err) {
+      setRecoverError((err as Error).message);
+      setRecovering(null);
+    }
+  }
 
   return (
     <main className="container">
@@ -35,18 +52,31 @@ export default function HomePage() {
           <h2>Interrupted uploads</h2>
           <p className="muted">
             These videos are safely stored on this device. Open one to resume
-            its upload.
+            where it left off.
           </p>
           <ul className="plain">
-            {pending.map((p) => (
-              <li key={p.captureId}>
-                <Link href={`/report/${p.captureId}`} className="btn">
-                  {new Date(p.createdAt).toLocaleString()} ·{" "}
-                  {(p.size / (1024 * 1024)).toFixed(1)} MB
-                </Link>
-              </li>
-            ))}
+            {pending.map((p) => {
+              const label = `${new Date(p.createdAt).toLocaleString()} · ${(p.size / (1024 * 1024)).toFixed(1)} MB`;
+              return (
+                <li key={p.captureId}>
+                  {p.registered === false ? (
+                    <button
+                      className="btn"
+                      disabled={recovering === p.captureId}
+                      onClick={() => void finishSecuring(p)}
+                    >
+                      {recovering === p.captureId ? "Securing timestamp…" : `${label} — finish securing`}
+                    </button>
+                  ) : (
+                    <Link href={`/report/${p.captureId}`} className="btn">
+                      {label}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+          {recoverError && <p style={{ color: "var(--danger)" }}>{recoverError}</p>}
         </section>
       )}
 

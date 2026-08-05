@@ -20,6 +20,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const [blobMissing, setBlobMissing] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const uploadStartedRef = useRef(false);
+  const uploadControllerRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -31,6 +32,11 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       if (!res.ok) return null;
       const rec = (await res.json()) as CaptureRecord;
       setRecord(rec);
+      // However the upload finished (this session, another tab, another
+      // day), a verified capture no longer needs the local copy.
+      if (rec.upload.status === "complete" && rec.upload.verified) {
+        void deletePendingVideo(id).catch(() => {});
+      }
       return rec;
     } catch {
       return null; // offline — keep the last known state
@@ -54,12 +60,16 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   }, [refresh]);
 
   // Auto-start/resume the upload once, when we know it's incomplete and the
-  // blob is on this device. (Ref guard: React strict mode double-runs effects.)
+  // blob is on this device. (Ref guard: React strict mode double-runs
+  // effects, and this effect re-fires on every poll's setRecord.)
   useEffect(() => {
     if (!record || record.upload.status === "complete" || uploadStartedRef.current) return;
     uploadStartedRef.current = true;
+    const controller = new AbortController();
+    uploadControllerRef.current = controller;
     void (async () => {
       const pending = await getPendingVideo(id).catch(() => undefined);
+      if (controller.signal.aborted) return;
       if (!pending) {
         setBlobMissing(true);
         return;
@@ -67,14 +77,23 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       try {
         const done = await uploadCapture(id, pending.blob, pending.mime, {
           onProgress: (sent, total) => setProgress({ sent, total }),
+          signal: controller.signal,
         });
         setRecord(done);
         if (done.upload.verified) await deletePendingVideo(id).catch(() => {});
       } catch (err) {
+        if ((err as Error).name === "AbortError") return;
         setUploadError((err as Error).message);
       }
     })();
   }, [record, id]);
+
+  // Abort the in-flight upload when leaving the page — a fresh instance
+  // resumes from the server's received-chunk list, instead of two uploaders
+  // racing over the same capture.
+  useEffect(() => {
+    return () => uploadControllerRef.current?.abort();
+  }, []);
 
   if (notFound) {
     return (
@@ -173,6 +192,17 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             {record.segments.length} areas covered
             {record.durationMs ? ` · ${Math.round(record.durationMs / 1000)} s total` : ""}
           </p>
+        </section>
+      )}
+
+      {(record.quality?.warnings.length ?? 0) > 0 && (
+        <section className="card">
+          <h2>Capture quality</h2>
+          {record.quality!.warnings.map((w) => (
+            <p key={w} className="muted" style={{ color: "var(--warn)" }}>
+              ⚠ {w}
+            </p>
+          ))}
         </section>
       )}
 

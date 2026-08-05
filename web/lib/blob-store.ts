@@ -1,6 +1,14 @@
 // IndexedDB persistence for recorded videos: the blob survives page reloads
 // and connection drops, so an interrupted upload can resume from the report
 // screen (or the home screen's "interrupted uploads" list).
+//
+// Entries saved at record-stop start life under a client-generated
+// `local-…` id with `registered: false` and the capture metadata attached;
+// once the hash-timestamp POST lands they are re-keyed to the server
+// capture id. Entries without the `registered` flag predate it and are
+// treated as registered.
+
+import type { CaptureCreateRequest } from "./types";
 
 export interface PendingVideo {
   captureId: string;
@@ -9,6 +17,10 @@ export interface PendingVideo {
   size: number;
   createdAt: string;
   source: "recorded" | "library";
+  /** false until the hash-timestamp POST has landed (offline record-stop). */
+  registered?: boolean;
+  /** Capture metadata kept locally so registration can be replayed later. */
+  meta?: CaptureCreateRequest;
 }
 
 const DB_NAME = "walkaround-inspector";
@@ -27,6 +39,9 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+/** Resolves on TRANSACTION completion, not request success — a write whose
+ * transaction later aborts (e.g. Safari hitting a storage quota) must
+ * reject, or callers would believe unsaved data is safe. */
 function tx<T>(
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest
@@ -36,10 +51,20 @@ function tx<T>(
       new Promise<T>((resolve, reject) => {
         const t = db.transaction(STORE, mode);
         const req = fn(t.objectStore(STORE));
-        req.onsuccess = () => resolve(req.result as T);
-        req.onerror = () => reject(req.error);
-        t.oncomplete = () => db.close();
-        t.onabort = () => db.close();
+        let result: T;
+        req.onsuccess = () => {
+          result = req.result as T;
+        };
+        t.oncomplete = () => {
+          db.close();
+          resolve(result);
+        };
+        const fail = () => {
+          db.close();
+          reject(t.error ?? req.error ?? new Error("IndexedDB transaction failed"));
+        };
+        t.onerror = fail;
+        t.onabort = fail;
       })
   );
 }

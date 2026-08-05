@@ -48,24 +48,41 @@ export async function uploadCapture(
   let sent = have.size;
   opts.onProgress?.(sent, totalChunks);
 
-  for (let i = 0; i < totalChunks; i++) {
-    if (have.has(i)) continue;
-    const part = blob.slice(i * CHUNK_SIZE, Math.min(blob.size, (i + 1) * CHUNK_SIZE));
-    await fetchWithRetry(
-      `/api/uploads/${captureId}/chunks/${i}`,
-      { method: "PUT", body: part },
+  try {
+    for (let i = 0; i < totalChunks; i++) {
+      if (have.has(i)) continue;
+      const part = blob.slice(i * CHUNK_SIZE, Math.min(blob.size, (i + 1) * CHUNK_SIZE));
+      await fetchWithRetry(
+        `/api/uploads/${captureId}/chunks/${i}`,
+        { method: "PUT", body: part },
+        opts.signal
+      );
+      sent++;
+      opts.onProgress?.(sent, totalChunks);
+    }
+
+    const done = await fetchWithRetry(
+      `/api/uploads/${captureId}/complete`,
+      { method: "POST" },
       opts.signal
     );
-    sent++;
-    opts.onProgress?.(sent, totalChunks);
+    return done.json();
+  } catch (err) {
+    // A concurrent uploader (second tab, earlier orphaned instance) may have
+    // finished first — chunk PUTs then 409 "already complete". That's
+    // success, not failure: confirm against the capture record.
+    if (err instanceof UploadRejectedError) {
+      const res = await fetch(`/api/capture/${captureId}`, {
+        cache: "no-store",
+        signal: opts.signal,
+      }).catch(() => null);
+      if (res?.ok) {
+        const record = (await res.json()) as CaptureRecord;
+        if (record.upload.status === "complete") return record;
+      }
+    }
+    throw err;
   }
-
-  const done = await fetchWithRetry(
-    `/api/uploads/${captureId}/complete`,
-    { method: "POST" },
-    opts.signal
-  );
-  return done.json();
 }
 
 /** Retries network failures and 5xx forever (capped backoff, waits for
