@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git add* .env*)",
+      "Bash(git commit* .env*)"
+    ],
+    "ask": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git branch -D*)",
+      "Bash(git push * --delete*)",
+      "Bash(git rebase*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf*)",
+      "Bash(sudo*)",
+      "Bash(npm install -g*)",
+      "Bash(brew *)",
+      "Bash(curl * | sh*)",
+      "Bash(curl * | bash*)"
+    ],
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
+}

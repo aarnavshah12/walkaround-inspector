@@ -1,0 +1,21 @@
+# deps / build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# runtime data (captures, chunks, videos, TSA tokens)
+data/
+
+# secrets — never commit
+.env
+.env.*
+.claude/settings.local.json
+
+# local working docs — never commit (owner directive)
+CLAUDE.md
+PROGRESS.md
+walkaround-inspector-plan-final.md
+
+# os / editor
+.DS_Store
