@@ -1,0 +1,239 @@
+:root {
+  --bg: #0d0c12;
+  --surface: #17161f;
+  --surface-2: #1f1d2a;
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f2f1f7;
+  --muted: #9b98ab;
+  --accent: #7c5cff;
+  --accent-soft: rgba(124, 92, 255, 0.16);
+  --ok: #3ddc97;
+  --warn: #ffb454;
+  --danger: #ff5c7a;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+.container {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 20px) 20px
+    calc(env(safe-area-inset-bottom) + 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100dvh;
+}
+
+h1 {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: block;
+  width: 100%;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+.btn:active {
+  transform: scale(0.985);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+}
+.btn-ghost {
+  background: transparent;
+}
+.btn-danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge.ok {
+  background: rgba(61, 220, 151, 0.14);
+  color: var(--ok);
+}
+.badge.warn {
+  background: rgba(255, 180, 84, 0.14);
+  color: var(--warn);
+}
+.badge.danger {
+  background: rgba(255, 92, 122, 0.14);
+  color: var(--danger);
+}
+
+.progress-track {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+.progress-fill {
+  background: var(--accent);
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+.progress-fill.ok {
+  background: var(--ok);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.dot.done {
+  background: var(--ok);
+  border-color: transparent;
+}
+.dot.now {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.video-frame {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--border);
+}
+.video-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rec-pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  backdrop-filter: blur(6px);
+}
+.rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.coach-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+ul.plain {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+a {
+  color: var(--accent);
+}
