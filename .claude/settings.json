@@ -5,6 +5,23 @@
       "Bash(git commit* .env*)"
     ],
     "ask": [
+      "mcp__roboflow__trainings_create",
+      "mcp__roboflow__trainings_cancel",
+      "mcp__roboflow__trainings_stop",
+      "mcp__roboflow__autolabel_start",
+      "mcp__roboflow__annotations_save",
+      "mcp__roboflow__annotation_batches_create",
+      "mcp__roboflow__annotation_batches_delete",
+      "mcp__roboflow__annotation_batches_merge",
+      "mcp__roboflow__annotation_jobs_create",
+      "mcp__roboflow__annotation_jobs_delete_annotations",
+      "mcp__roboflow__versions_generate",
+      "mcp__roboflow__versions_export",
+      "mcp__roboflow__projects_create",
+      "mcp__roboflow__projects_fork",
+      "mcp__roboflow__api_keys_create",
+      "mcp__roboflow__api_keys_revoke",
+      "mcp__roboflow__api_keys_disable",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
       "Bash(git branch -D*)",
@@ -28,6 +45,7 @@
       "Bash(git add*)",
       "Bash(git commit*)",
       "Bash(git push*)",
+      "mcp__roboflow",
       "WebFetch",
       "WebSearch"
     ]
