@@ -19,6 +19,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { DATA_DIR, TSA_TIMEOUT_MS, TSA_URL } from "./config";
 import { isValidCaptureId } from "./store";
+import { parseTimeStampResp } from "../der";
 
 const TOKENS_DIR = path.join(DATA_DIR, "captures");
 
@@ -62,35 +63,10 @@ export function buildTimeStampReq(hashHex: string): Buffer {
   return tlv(0x30, Buffer.concat([version, messageImprint, nonce, certReq]));
 }
 
-/** Minimal DER walk: TimeStampResp ::= SEQUENCE { status PKIStatusInfo, ... }
- * where PKIStatusInfo ::= SEQUENCE { status INTEGER, ... }. Returns the
- * PKIStatus value, or null if the bytes don't look like a TimeStampResp. */
+/** PKIStatus of a TimeStampResp via the shared DER module, or null if the
+ * bytes don't look like a TimeStampResp. */
 export function parsePkiStatus(resp: Buffer): number | null {
-  const readHeader = (
-    buf: Buffer,
-    offset: number
-  ): { tag: number; length: number; contentStart: number } | null => {
-    if (offset + 2 > buf.length) return null;
-    const tag = buf[offset];
-    let length = buf[offset + 1];
-    let contentStart = offset + 2;
-    if (length & 0x80) {
-      const numBytes = length & 0x7f;
-      if (numBytes === 0 || numBytes > 4 || contentStart + numBytes > buf.length) return null;
-      length = 0;
-      for (let i = 0; i < numBytes; i++) length = length * 256 + buf[contentStart + i];
-      contentStart += numBytes;
-    }
-    return { tag, length, contentStart };
-  };
-
-  const outer = readHeader(resp, 0);
-  if (!outer || outer.tag !== 0x30) return null;
-  const statusInfo = readHeader(resp, outer.contentStart);
-  if (!statusInfo || statusInfo.tag !== 0x30) return null;
-  const statusInt = readHeader(resp, statusInfo.contentStart);
-  if (!statusInt || statusInt.tag !== 0x02 || statusInt.length < 1) return null;
-  return resp[statusInt.contentStart];
+  return parseTimeStampResp(new Uint8Array(resp))?.status ?? null;
 }
 
 export function tokenPath(captureId: string): string {
@@ -103,13 +79,16 @@ export interface TsaResult {
   error?: string;
 }
 
-/** Request a timestamp token for the capture's hash and persist the raw
- * TimeStampResp next to the capture record. Never throws — failures come
- * back as { ok: false } so the capture POST stays fast and unconditional. */
-export async function requestTimestamp(
-  captureId: string,
-  hashHex: string
-): Promise<TsaResult> {
+export interface TokenResult {
+  ok: boolean;
+  token?: Buffer;
+  error?: string;
+}
+
+/** Fetch a granted RFC 3161 token for a SHA-256 hex digest. Never throws —
+ * failures come back as { ok: false }. Used both for capture hashes and
+ * (Phase 6) for signed-report digests. */
+export async function fetchTimestampToken(hashHex: string): Promise<TokenResult> {
   try {
     const req = buildTimeStampReq(hashHex);
     const res = await fetch(TSA_URL, {
@@ -124,8 +103,23 @@ export async function requestTimestamp(
     if (status !== 0 && status !== 1) {
       return { ok: false, error: `TSA PKIStatus ${status ?? "unparseable"}` };
     }
+    return { ok: true, token: body };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Request a timestamp token for the capture's hash and persist the raw
+ * TimeStampResp next to the capture record. */
+export async function requestTimestamp(
+  captureId: string,
+  hashHex: string
+): Promise<TsaResult> {
+  const result = await fetchTimestampToken(hashHex);
+  if (!result.ok || !result.token) return { ok: false, error: result.error };
+  try {
     await fs.mkdir(TOKENS_DIR, { recursive: true });
-    await fs.writeFile(tokenPath(captureId), body);
+    await fs.writeFile(tokenPath(captureId), result.token);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
