@@ -13,6 +13,8 @@ localization, and findings.json assembly.
 Requires ROBOFLOW_API_KEY in the environment (model weights download).
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
