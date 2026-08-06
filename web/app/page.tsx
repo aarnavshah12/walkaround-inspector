@@ -35,27 +35,35 @@ export default function HomePage() {
   }
 
   return (
-    <main className="container">
-      <div>
-        <h1>Walkaround Inspector</h1>
-        <p className="muted" style={{ marginTop: 6 }}>
-          Upload a slow walkaround video of the car. We fingerprint and
-          timestamp it the moment you pick it, then find scratches, dents,
-          and stains automatically — reflections filtered out.
+    <main className="container fade-stagger">
+      <section className="hero">
+        <h1>
+          Proof of condition,
+          <br />
+          <span className="grad-text">before you drive off.</span>
+        </h1>
+        <p className="lede">
+          Upload a slow walkaround video of the car. It&apos;s fingerprinted
+          and timestamp-certified the moment you pick it — then AI finds the
+          scratches, dents, and stains, with reflections filtered out.
         </p>
-      </div>
+      </section>
 
       <Link href="/upload" className="btn btn-primary">
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 16V4m0 0 4 4m-4-4-4 4" />
+          <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+        </svg>
         Upload walkaround video
       </Link>
-      <p className="muted">
-        Tip: upload before you drive off — the certified timestamp proves the
-        video existed right then.
+      <p className="muted" style={{ textAlign: "center" }}>
+        Upload before you drive off — the certified timestamp proves the video
+        existed right then.
       </p>
 
       {pending.length > 0 && (
         <section className="card">
-          <h2>Interrupted uploads</h2>
+          <span className="section-label">Interrupted uploads</span>
           <p className="muted">
             These videos are safely stored on this device. Open one to resume
             where it left off.
@@ -82,13 +90,37 @@ export default function HomePage() {
               );
             })}
           </ul>
-          {recoverError && <p style={{ color: "var(--danger)" }}>{recoverError}</p>}
+          {recoverError && <p className="muted" style={{ color: "var(--danger)" }}>{recoverError}</p>}
         </section>
       )}
 
-      <p className="muted" style={{ marginTop: "auto" }}>
-        Add this app to your home screen so it&apos;s one tap away at the
-        rental lot.
+      <section className="card">
+        <span className="section-label">How it works</span>
+        <div className="step-row">
+          <span className="step-icon done">1</span>
+          <p className="muted">
+            <strong style={{ color: "var(--text-2)" }}>Fingerprint & certify</strong> — the video&apos;s
+            SHA-256 is timestamped by an independent authority before it even uploads.
+          </p>
+        </div>
+        <div className="step-row">
+          <span className="step-icon done">2</span>
+          <p className="muted">
+            <strong style={{ color: "var(--text-2)" }}>Detect & filter</strong> — AI finds damage across
+            frames; a physics filter rejects reflections and glare.
+          </p>
+        </div>
+        <div className="step-row">
+          <span className="step-icon done">3</span>
+          <p className="muted">
+            <strong style={{ color: "var(--text-2)" }}>Signed report</strong> — a tamper-evident PDF
+            anyone can verify, without trusting us.
+          </p>
+        </div>
+      </section>
+
+      <p className="muted" style={{ marginTop: "auto", textAlign: "center" }}>
+        Add to your home screen so it&apos;s one tap away at the rental lot.
       </p>
     </main>
   );

@@ -15,6 +15,21 @@ import { MIN_HEIGHT_PX, MIN_WALKAROUND_MS } from "../../lib/coach";
 
 type Step = "idle" | "probing" | "hashing" | "registering" | "error";
 
+const SECURING_STEPS = [
+  {
+    title: "Read",
+    detail: "Duration and resolution are checked so quality issues surface before you leave the lot.",
+  },
+  {
+    title: "Fingerprint",
+    detail: "A SHA-256 hash of the exact file is computed right here in your browser.",
+  },
+  {
+    title: "Certify",
+    detail: "The fingerprint is timestamped by the server — before the upload even starts.",
+  },
+] as const;
+
 export default function UploadPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,16 +82,26 @@ export default function UploadPage() {
 
   const busy = step === "probing" || step === "hashing" || step === "registering";
 
-  return (
-    <main className="container">
-      <h1>New inspection</h1>
+  // Render-only mapping of the existing `step` state onto the three
+  // securing rows: -1 = not started (idle/error), 0..2 = current phase.
+  const phase =
+    step === "probing" ? 0 : step === "hashing" ? 1 : step === "registering" ? 2 : -1;
 
-      <p className="muted">
-        Pick your walkaround video. Everything after that is automatic:
-        it&apos;s fingerprinted (SHA-256) and timestamp-certified before the
-        upload even starts, uploads in resumable chunks that survive bad
-        signal, and damage analysis begins the moment the upload lands.
-      </p>
+  return (
+    <main className="container fade-stagger">
+      <section className="hero">
+        <span className="section-label">New inspection</span>
+        <h1>
+          Pick the video.
+          <br />
+          <span className="grad-text">We secure the rest.</span>
+        </h1>
+        <p className="lede">
+          Your walkaround is fingerprinted and timestamp-certified the moment
+          you choose it. Then it uploads in resumable chunks that survive bad
+          signal, and damage analysis starts on its own.
+        </p>
+      </section>
 
       <input
         ref={inputRef}
@@ -88,23 +113,101 @@ export default function UploadPage() {
           if (f) void onFile(f);
         }}
       />
-      <button className="btn btn-primary" disabled={busy} onClick={() => inputRef.current?.click()}>
-        {step === "idle" || step === "error"
-          ? "Choose a video"
-          : step === "probing"
-            ? "Reading video…"
-            : step === "hashing"
-              ? "Computing fingerprint…"
-              : "Certifying timestamp…"}
+
+      <button
+        className="btn btn-primary"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+      >
+        {step === "idle" || step === "error" ? (
+          <>
+            <svg
+              className="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M12 16V4m0 0 4 4m-4-4-4 4" />
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+            </svg>
+            Choose a video
+          </>
+        ) : step === "probing" ? (
+          "Reading video…"
+        ) : step === "hashing" ? (
+          "Computing fingerprint…"
+        ) : (
+          "Certifying timestamp…"
+        )}
       </button>
 
-      <p className="muted">
-        The certified timestamp proves this exact video existed when you
-        uploaded it — so upload before you drive off.
+      <p className="muted" style={{ textAlign: "center" }}>
+        Upload before you drive off — the certified timestamp proves this
+        exact video existed right then.
       </p>
 
+      <section className="card" aria-live="polite">
+        <div className="row">
+          <span className="section-label">Securing your video</span>
+          {busy ? (
+            <span className="badge pulse">In progress</span>
+          ) : (
+            <span className="badge">Automatic</span>
+          )}
+        </div>
+
+        {busy && (
+          <div className="progress-track" aria-hidden>
+            <div
+              className="progress-fill active"
+              style={{ width: `${18 + phase * 34}%` }}
+            />
+          </div>
+        )}
+
+        {SECURING_STEPS.map((s, i) => {
+          const state = phase === -1 ? "" : i < phase ? " done" : i === phase ? " active" : "";
+          return (
+            <div className="step-row" key={s.title}>
+              <span className={`step-icon${state}`} aria-hidden>
+                {state === " done" ? (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                ) : (
+                  i + 1
+                )}
+              </span>
+              <p className="muted">
+                <strong style={{ color: "var(--text-2)" }}>{s.title}</strong> — {s.detail}
+              </p>
+            </div>
+          );
+        })}
+      </section>
+
       {step === "error" && (
-        <p style={{ color: "var(--danger)" }}>Could not process the video: {errorMsg}</p>
+        <section className="card" role="alert">
+          <div className="row">
+            <span className="section-label">Upload not started</span>
+            <span className="badge danger">Error</span>
+          </div>
+          <p className="muted">Could not process the video: {errorMsg}</p>
+          <p className="muted">The video was not uploaded — choose it again to retry.</p>
+        </section>
       )}
     </main>
   );

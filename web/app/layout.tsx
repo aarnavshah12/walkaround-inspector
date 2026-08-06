@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0c12",
+  themeColor: "#08080d",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -29,6 +29,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <header className="topbar">
+          <a href="/" className="brand">
+            <span className="brand-mark" aria-hidden />
+            Walkaround
+          </a>
+          <a href="/verify" className="topbar-link">
+            Verify a report
+          </a>
+        </header>
         {children}
         <SwRegister />
       </body>

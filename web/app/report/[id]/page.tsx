@@ -20,6 +20,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
   const [blobMissing, setBlobMissing] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [copied, setCopied] = useState(false);
   const uploadStartedRef = useRef(false);
   const uploadControllerRef = useRef<AbortController | null>(null);
 
@@ -112,17 +113,31 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
   if (notFound) {
     return (
-      <main className="container">
-        <h1>Report</h1>
-        <p className="muted">No capture with this id. <Link href="/">Back home</Link>.</p>
+      <main className="container fade-stagger">
+        <section className="hero">
+          <h1>
+            Report <span className="grad-text">not found</span>
+          </h1>
+          <p className="lede">
+            There&apos;s no capture with this id — it may have been created on a
+            different device.
+          </p>
+        </section>
+        <Link href="/" className="btn btn-ghost">
+          Back home
+        </Link>
       </main>
     );
   }
   if (!record) {
     return (
       <main className="container">
-        <h1>Report</h1>
-        <p className="muted">Loading…</p>
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          <h1>
+            Inspection <span className="grad-text">report</span>
+          </h1>
+          <span className="badge pulse">Loading</span>
+        </div>
       </main>
     );
   }
@@ -138,91 +153,42 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           : 0;
 
   return (
-    <main className="container">
-      <div className="row">
-        <h1>Inspection report</h1>
+    <main className="container fade-stagger">
+      <header className="row" style={{ flexWrap: "wrap", paddingTop: 6 }}>
+        <h1>
+          Inspection <span className="grad-text">report</span>
+        </h1>
         {record.source === "library" ? (
           <span className="badge">Uploaded video</span>
         ) : (
           <span className="badge ok">Recorded in app</span>
         )}
-      </div>
+      </header>
 
       <section className="card">
-        <h2>Capture integrity</h2>
-        <div>
-          <p className="muted">Video fingerprint (SHA-256)</p>
-          <p className="mono">{record.hash}</p>
-        </div>
         <div className="row">
-          <span className="muted">
-            {record.source === "library" ? "Received" : "Recorded"}{" "}
-            {new Date(record.clientTime).toLocaleString()}
-          </span>
-          {record.tsa.status === "granted" ? (
-            <span className="badge ok">✓ Timestamp certified</span>
+          <span className="section-label">Damage findings</span>
+          {up.status !== "complete" ? (
+            <span className="badge pulse">Waiting for upload</span>
+          ) : up.verified === false ? (
+            <span className="badge danger">Skipped</span>
+          ) : record.analysis?.status === "failed" || record.analysis?.status === "unavailable" ? (
+            <span className="badge danger">
+              {record.analysis?.status === "failed" ? "Failed" : "Unavailable"}
+            </span>
+          ) : record.analysis?.status !== "complete" ? (
+            <span className="badge pulse">Analyzing</span>
+          ) : !findings ? (
+            <span className="badge pulse">Loading</span>
+          ) : findings.findings.length === 0 ? (
+            <span className="badge ok">No damage found</span>
           ) : (
-            <span className="badge warn">Timestamp pending — retrying</span>
+            <span className="badge danger">
+              {findings.findings.length} finding{findings.findings.length === 1 ? "" : "s"}
+            </span>
           )}
         </div>
-        {record.source === "library" && (
-          <p className="muted">
-            This timestamp proves when the video was received — not when it was
-            filmed.
-          </p>
-        )}
-      </section>
 
-      <section className="card">
-        <h2>Video upload</h2>
-        {up.status === "complete" ? (
-          up.verified ? (
-            <span className="badge ok">✓ Uploaded — bytes match the timestamped fingerprint</span>
-          ) : (
-            <span className="badge danger">Uploaded, but hash mismatch — integrity not verified</span>
-          )
-        ) : blobMissing ? (
-          <p className="muted">
-            The video isn&apos;t stored on this device. Open this report on the
-            device that recorded it to finish the upload.
-          </p>
-        ) : (
-          <>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${pct}%` }} />
-            </div>
-            <p className="muted">
-              {pct}% — uploading in the background. Safe to keep this page open
-              through connection drops; it resumes automatically.
-            </p>
-          </>
-        )}
-        {uploadError && <p style={{ color: "var(--danger)" }}>{uploadError}</p>}
-      </section>
-
-      {record.segments && record.segments.length > 0 && (
-        <section className="card">
-          <h2>Coverage</h2>
-          <p className="muted">
-            {record.segments.length} areas covered
-            {record.durationMs ? ` · ${Math.round(record.durationMs / 1000)} s total` : ""}
-          </p>
-        </section>
-      )}
-
-      {(record.quality?.warnings.length ?? 0) > 0 && (
-        <section className="card">
-          <h2>Capture quality</h2>
-          {record.quality!.warnings.map((w) => (
-            <p key={w} className="muted" style={{ color: "var(--warn)" }}>
-              ⚠ {w}
-            </p>
-          ))}
-        </section>
-      )}
-
-      <section className="card">
-        <h2>Findings</h2>
         {record.upload.status !== "complete" ? (
           <p className="muted">Analysis starts automatically once the upload completes.</p>
         ) : record.upload.verified === false ? (
@@ -232,50 +198,44 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             to the certified video.
           </p>
         ) : record.analysis?.status === "failed" || record.analysis?.status === "unavailable" ? (
-          <p style={{ color: "var(--danger)" }}>
+          <p className="muted" style={{ color: "var(--danger)" }}>
             Analysis {record.analysis.status === "failed" ? "failed" : "couldn't start"}
             {record.analysis.error ? ` — ${record.analysis.error}` : ""}.
           </p>
         ) : record.analysis?.status !== "complete" ? (
-          <>
+          <div className="stack-sm">
+            <div className="row">
+              <span className="muted">{record.analysis?.stage ?? "Starting analysis"}</span>
+              <span className="muted" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {Math.round((record.analysis?.progress ?? 0) * 100)}%
+              </span>
+            </div>
             <div className="progress-track">
               <div
-                className="progress-fill"
+                className="progress-fill active"
                 style={{ width: `${Math.round((record.analysis?.progress ?? 0) * 100)}%` }}
               />
             </div>
             <p className="muted">
-              {record.analysis?.stage ?? "Starting analysis"} —{" "}
-              {Math.round((record.analysis?.progress ?? 0) * 100)}%
-              {analysisEta(record.analysis)}. This page updates automatically.
+              Running automatically{analysisEta(record.analysis)}. This page
+              updates itself — no need to refresh.
             </p>
-          </>
+          </div>
         ) : !findings ? (
           <p className="muted">Loading findings…</p>
         ) : findings.findings.length === 0 ? (
-          <>
-            <span className="badge ok">✓ No damage found</span>
-            <p className="muted">
-              No confirmed damage in this walkaround.
-              {findings.rejected.length > 0 &&
-                ` ${findings.rejected.length} candidate detection${findings.rejected.length === 1 ? "" : "s"} rejected as reflections, glare, or noise.`}
-            </p>
-          </>
+          <p className="muted">
+            No confirmed damage in this walkaround.
+            {findings.rejected.length > 0 &&
+              ` ${findings.rejected.length} candidate detection${findings.rejected.length === 1 ? "" : "s"} rejected as reflections, glare, or noise.`}
+          </p>
         ) : (
           <>
             {findings.findings.map((f) => (
-              <div
-                key={f.id}
-                className="card"
-                style={{ background: "var(--surface-2)", opacity: f.veto ? 0.55 : 1 }}
-              >
+              <div key={f.id} className={`card-nested finding-card${f.veto ? " vetoed" : ""}`}>
                 {f.crop && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={f.crop}
-                    alt={`${f.class} crop`}
-                    style={{ borderRadius: 8, maxWidth: "100%" }}
-                  />
+                  <img src={f.crop} alt={`${f.class} crop`} className="finding-media" />
                 )}
                 <div className="row">
                   <span className={`badge ${f.veto ? "warn" : "danger"}`}>
@@ -283,7 +243,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
                       ? f.assessment.damage_type
                       : f.class}
                   </span>
-                  <span className="muted">
+                  <span className="muted" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {f.confidence.max !== null ? `${Math.round(f.confidence.max * 100)}% confidence` : ""}
                   </span>
                 </div>
@@ -329,19 +289,29 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
       {findings?.annotated && (
         <section className="card">
-          <h2>Annotated walkaround</h2>
+          <span className="section-label">Annotated walkaround</span>
           <video
+            className="player"
             controls
             playsInline
             preload="metadata"
             src={`/api/capture/${id}/annotated`}
-            style={{ width: "100%", borderRadius: 8, background: "#000" }}
           />
-          <p className="muted">
-            Every detection the pipeline tracked: red = confirmed finding,
-            amber = AI-assessed false positive, gray = rejected as
-            reflection/noise.
-          </p>
+          <p className="muted">Every detection the pipeline tracked, frame by frame.</p>
+          <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 14 }}>
+            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--danger)", flex: "none" }} />
+              Confirmed finding
+            </span>
+            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--warn)", flex: "none" }} />
+              AI-assessed false positive
+            </span>
+            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--muted)", flex: "none" }} />
+              Rejected reflection / noise
+            </span>
+          </div>
         </section>
       )}
 
@@ -349,10 +319,10 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         Object.values(findings.vehicle).some((v) => v && v !== "unknown" && v !== "unreadable") && (
           <section className="card">
             <div className="row">
-              <h2>Vehicle</h2>
+              <span className="section-label">Vehicle</span>
               <span className="badge">AI-assessed</span>
             </div>
-            <p className="muted">
+            <p style={{ fontWeight: 700, fontSize: "1.06rem", letterSpacing: "-0.01em" }}>
               {[
                 findings.vehicle.color,
                 findings.vehicle.make,
@@ -363,28 +333,159 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
               ]
                 .filter((v) => v && v !== "unknown")
                 .join(" ")}
-              {findings.vehicle.license_plate &&
-                findings.vehicle.license_plate !== "unreadable" &&
-                ` · plate ${findings.vehicle.license_plate}`}
             </p>
+            {findings.vehicle.license_plate && findings.vehicle.license_plate !== "unreadable" && (
+              <span className="hash-chip mono" style={{ width: "fit-content" }}>
+                Plate · {findings.vehicle.license_plate}
+              </span>
+            )}
           </section>
         )}
+
+      <section className="card">
+        <div className="row">
+          <span className="section-label">Capture integrity</span>
+          {record.tsa.status === "granted" ? (
+            <span className="badge ok">Timestamp certified</span>
+          ) : (
+            <span className="badge warn pulse">Timestamp pending</span>
+          )}
+        </div>
+
+        <div className="stack-sm">
+          <span className="muted">Video fingerprint (SHA-256)</span>
+          <div className="hash-chip mono" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1 }}>{record.hash}</span>
+            <button
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(record.hash)
+                  .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1600);
+                  })
+                  .catch(() => {});
+              }}
+              aria-label={copied ? "Fingerprint copied" : "Copy fingerprint"}
+              title="Copy fingerprint"
+              style={{
+                appearance: "none",
+                background: "transparent",
+                border: "none",
+                color: copied ? "var(--ok)" : "var(--muted)",
+                cursor: "pointer",
+                padding: 2,
+                display: "inline-flex",
+                flex: "none",
+              }}
+            >
+              {copied ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="9" y="9" width="12" height="12" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <dl>
+          <div className="kv">
+            <dt>{record.source === "library" ? "Received" : "Recorded"}</dt>
+            <dd>{new Date(record.clientTime).toLocaleString()}</dd>
+          </div>
+        </dl>
+
+        {up.status === "complete" ? (
+          up.verified ? (
+            <span className="badge ok">Uploaded — bytes match the certified fingerprint</span>
+          ) : (
+            <span className="badge danger">Uploaded, but hash mismatch — not verified</span>
+          )
+        ) : blobMissing ? (
+          <p className="muted">
+            The video isn&apos;t stored on this device. Open this report on the
+            device that recorded it to finish the upload.
+          </p>
+        ) : (
+          <div className="stack-sm">
+            <div className="row">
+              <span className="muted">Uploading video</span>
+              <span className="muted" style={{ fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+            </div>
+            <div className="progress-track">
+              <div className="progress-fill active" style={{ width: `${pct}%` }} />
+            </div>
+            <p className="muted">
+              Safe to keep this page open through connection drops — the upload
+              resumes automatically.
+            </p>
+          </div>
+        )}
+        {uploadError && <p className="muted" style={{ color: "var(--danger)" }}>{uploadError}</p>}
+
+        {record.source === "library" && (
+          <p className="muted">
+            This timestamp proves when the video was received — not when it was
+            filmed.
+          </p>
+        )}
+      </section>
+
+      {record.segments && record.segments.length > 0 && (
+        <section className="card">
+          <span className="section-label">Coverage</span>
+          <dl>
+            <div className="kv">
+              <dt>Areas covered</dt>
+              <dd>{record.segments.length}</dd>
+            </div>
+            {record.durationMs ? (
+              <div className="kv">
+                <dt>Total duration</dt>
+                <dd>{Math.round(record.durationMs / 1000)} s</dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+      )}
+
+      {(record.quality?.warnings.length ?? 0) > 0 && (
+        <section className="card">
+          <div className="row">
+            <span className="section-label">Capture quality</span>
+            <span className="badge warn">
+              {record.quality!.warnings.length} warning{record.quality!.warnings.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          {record.quality!.warnings.map((w) => (
+            <p key={w} className="muted" style={{ color: "var(--warn)" }}>
+              ⚠ {w}
+            </p>
+          ))}
+        </section>
+      )}
 
       {record.upload.verified === true &&
         record.analysis?.status === "complete" &&
         record.tsa.status === "granted" && (
-          <a href={`/api/capture/${id}/report`} className="btn btn-primary">
-            Download signed PDF report
-          </a>
+          <div className="stack-sm">
+            <a href={`/api/capture/${id}/report`} className="btn btn-primary">
+              <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 4v12m0 0 4-4m-4 4-4-4" />
+                <path d="M4 20h16" />
+              </svg>
+              Download signed PDF report
+            </a>
+            <p className="muted" style={{ textAlign: "center" }}>
+              Tamper-evident PDF — anyone can check it, no account needed.
+            </p>
+          </div>
         )}
-      <p className="muted">
-        Anyone can check a downloaded report at the{" "}
-        <Link href="/verify">verifier page</Link> — no account needed.
-      </p>
-
-      <Link href="/" className="btn btn-ghost">
-        Home
-      </Link>
     </main>
   );
 }

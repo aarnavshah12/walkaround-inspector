@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Record a timestamped walkaround video of a rental car before you drive off. Damage detection and a signed report follow.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0d0c12",
-    theme_color: "#0d0c12",
+    background_color: "#08080d",
+    theme_color: "#08080d",
     icons: [
       {
         src: "/icons/icon-192.png",

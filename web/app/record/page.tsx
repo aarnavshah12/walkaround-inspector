@@ -286,24 +286,51 @@ export default function RecordPage() {
   const isLast = segIndex === COACH_SEGMENTS.length - 1;
 
   return (
-    <main className="container">
-      <h1>Record walkaround</h1>
+    <main className="container fade-stagger">
+      <section className="hero" style={{ padding: "10px 4px 0" }}>
+        <h1>
+          Record <span className="grad-text">walkaround</span>
+        </h1>
+      </section>
 
       {(phase === "setup" || phase === "preview" || phase === "recording") && (
         <div className="video-frame">
           <video ref={videoRef} muted playsInline autoPlay />
+          {phase === "setup" && (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                color: "var(--muted)",
+              }}
+            >
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="6" width="14" height="12" rx="2.5" />
+                <path d="m16 10 5-3v10l-5-3" />
+              </svg>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                Camera preview appears here
+              </span>
+            </div>
+          )}
           {phase === "recording" && (
             <>
-              <div className="rec-pill">
-                <span className="rec-dot" />
+              <div className="rec-pill" aria-label="Recording time">
+                <span className="rec-dot" aria-hidden />
                 {formatMs(totalElapsed)}
               </div>
               <div className="coach-overlay">
                 <div className="row">
-                  <strong>
+                  <strong style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>
                     {segIndex + 1}/{COACH_SEGMENTS.length} · {seg.label}
                   </strong>
-                  <span className="dots">
+                  <span className="dots" aria-label={`Area ${segIndex + 1} of ${COACH_SEGMENTS.length}`}>
                     {COACH_SEGMENTS.map((s, i) => (
                       <span
                         key={s.id}
@@ -312,10 +339,12 @@ export default function RecordPage() {
                     ))}
                   </span>
                 </div>
-                <span className="muted" style={{ color: "#d8d5e6" }}>{seg.hint}</span>
+                <span style={{ color: "#d8d5e6", fontSize: "0.86rem", lineHeight: 1.45 }}>
+                  {seg.hint}
+                </span>
                 <div className="progress-track">
                   <div
-                    className={`progress-fill ${segReady ? "ok" : ""}`}
+                    className={`progress-fill ${segReady ? "ok" : "active"}`}
                     style={{ width: `${Math.min(100, (segElapsed / seg.minMs) * 100)}%` }}
                   />
                 </div>
@@ -326,33 +355,54 @@ export default function RecordPage() {
       )}
 
       {phase === "setup" && (
-        <>
+        <section className="card">
+          <div className="row">
+            <span className="section-label">Before you start</span>
+            <span className="badge">Camera off</span>
+          </div>
           <p className="muted">
             You&apos;ll be guided around the car area by area. Walk slowly and
             keep the panels filling the frame.
           </p>
           <button className="btn btn-primary" onClick={enableCamera}>
+            <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="2" y="6" width="14" height="12" rx="2.5" />
+              <path d="m16 10 5-3v10l-5-3" />
+            </svg>
             Enable camera
           </button>
-        </>
+        </section>
       )}
 
       {phase === "preview" && (
-        <>
+        <section className="card">
+          <div className="row">
+            <span className="section-label">Framing</span>
+            <span className="badge ok">Camera ready</span>
+          </div>
           <p className="muted">
             Step back until the whole car is in frame, then start. Recording
             works offline — the upload waits for signal.
           </p>
           <button className="btn btn-primary" onClick={startRecording}>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden>
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
+              <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+            </svg>
             Start recording
           </button>
-        </>
+        </section>
       )}
 
       {phase === "recording" && (
         <>
           <button className="btn btn-primary" onClick={nextSegment} disabled={!segReady}>
             {isLast ? "Finish walkaround" : segReady ? `Next: ${COACH_SEGMENTS[segIndex + 1].label}` : "Keep filming this area…"}
+            {segReady && (
+              <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                {isLast ? <path d="M20 6 9 17l-5-5" /> : <path d="M5 12h14m-6-6 6 6-6 6" />}
+              </svg>
+            )}
           </button>
           <button className="btn btn-ghost" onClick={stopRecording}>
             Stop early
@@ -362,15 +412,22 @@ export default function RecordPage() {
 
       {(phase === "finalizing" || phase === "done") && finalize && (
         <section className="card">
-          <h2>Securing your evidence</h2>
+          <div className="row">
+            <span className="section-label">Securing your evidence</span>
+            {phase === "done" ? (
+              <span className="badge ok">Secured</span>
+            ) : (
+              <span className="badge pulse">In progress</span>
+            )}
+          </div>
           {(() => {
             const idx = FINALIZE_STEPS.indexOf(finalize.step);
             return (
-              <>
-                <FinalizeRow label="Video saved on this device" done={idx > 0} active={idx === 0} />
-                <FinalizeRow label="Fingerprint (SHA-256) computed" done={idx > 1} active={idx === 1} />
-                <FinalizeRow label="Fingerprint timestamped" done={idx > 2} active={idx === 2} />
-              </>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <FinalizeRow n={1} label="Video saved on this device" done={idx > 0} active={idx === 0} />
+                <FinalizeRow n={2} label="Fingerprint (SHA-256) computed" done={idx > 1} active={idx === 1} />
+                <FinalizeRow n={3} label="Fingerprint timestamped" done={idx > 2} active={idx === 2} />
+              </div>
             );
           })()}
           {finalize.step === "timestamping" && (
@@ -380,9 +437,12 @@ export default function RecordPage() {
             </p>
           )}
           {finalize.warnings.length > 0 && (
-            <div>
+            <div className="card-nested">
               {finalize.warnings.map((w) => (
-                <p key={w} className="muted" style={{ color: "var(--warn)" }}>⚠ {w}</p>
+                <div key={w} className="row" style={{ justifyContent: "flex-start", alignItems: "flex-start" }}>
+                  <span className="badge warn">Heads-up</span>
+                  <span className="muted" style={{ flex: 1 }}>{w}</span>
+                </div>
               ))}
             </div>
           )}
@@ -390,6 +450,9 @@ export default function RecordPage() {
             <>
               <button className="btn btn-primary" onClick={() => router.push(`/report/${finalize.captureId}`)}>
                 Continue to report &amp; upload
+                <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M5 12h14m-6-6 6 6-6 6" />
+                </svg>
               </button>
               {finalize.warnings.length > 0 && (
                 <button className="btn btn-ghost" onClick={() => window.location.reload()}>
@@ -403,7 +466,8 @@ export default function RecordPage() {
 
       {phase === "error" && (
         <section className="card">
-          <p style={{ color: "var(--danger)" }}>{errorMsg}</p>
+          <span className="badge danger">Recording problem</span>
+          <p className="muted" style={{ color: "var(--danger)" }}>{errorMsg}</p>
           <button className="btn" onClick={() => window.location.reload()}>
             Try again
           </button>
@@ -413,11 +477,15 @@ export default function RecordPage() {
   );
 }
 
-function FinalizeRow({ label, done, active }: { label: string; done: boolean; active: boolean }) {
+function FinalizeRow({ n, label, done, active }: { n: number; label: string; done: boolean; active: boolean }) {
   return (
-    <div className="row" style={{ justifyContent: "flex-start" }}>
-      <span className={`badge ${done ? "ok" : ""}`}>{done ? "✓" : active ? "…" : "·"}</span>
-      <span className={done ? "" : "muted"}>{label}</span>
+    <div className="step-row">
+      <span className={`step-icon ${done ? "done" : active ? "active" : ""}`} aria-hidden>
+        {done ? "✓" : n}
+      </span>
+      <span className={done || active ? "" : "muted"} style={{ fontSize: "0.95rem" }}>
+        {label}
+      </span>
     </div>
   );
 }

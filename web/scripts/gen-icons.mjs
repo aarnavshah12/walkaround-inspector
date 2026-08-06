@@ -29,9 +29,9 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crc]);
 }
 
-const BG = [19, 17, 32];
+const BG = [8, 8, 13];
 const RING = [242, 241, 247];
-const DOT = [124, 92, 255];
+const DOT = [139, 92, 246];
 
 function smooth(x, edge0, edge1) {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
