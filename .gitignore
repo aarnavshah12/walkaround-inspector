@@ -9,10 +9,10 @@ __pycache__/
 # runtime data (captures, chunks, videos, TSA tokens)
 data/
 
-# secrets — never commit
+# secrets & agent config — never commit (owner directive)
 .env
 .env.*
-.claude/settings.local.json
+.claude/
 
 # local working docs — never commit (owner directive)
 CLAUDE.md
