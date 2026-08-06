@@ -27,3 +27,6 @@ phase6-design.md
 
 # os / editor
 .DS_Store
+
+# generated signed reports — contain plates/PII
+walkaround-report-*.pdf
