@@ -43,9 +43,9 @@ export default function HomePage() {
           <span className="grad-text">before you drive off.</span>
         </h1>
         <p className="lede">
-          Upload a slow walkaround video of the car. It&apos;s fingerprinted
-          and timestamp-certified the moment you pick it — then AI finds the
-          scratches, dents, and stains, with reflections filtered out.
+          Upload a slow walkaround video of the car. It&apos;s timestamped the
+          moment you pick it — then AI finds the scratches, dents, and stains,
+          with reflections filtered out.
         </p>
       </section>
 
@@ -99,8 +99,8 @@ export default function HomePage() {
         <div className="step-row">
           <span className="step-icon done">1</span>
           <p className="muted">
-            <strong style={{ color: "var(--text-2)" }}>Fingerprint & certify</strong> — the video&apos;s
-            SHA-256 is timestamped by an independent authority before it even uploads.
+            <strong style={{ color: "var(--text-2)" }}>Timestamp</strong> — an independent authority
+            certifies when your exact video existed, before it even uploads.
           </p>
         </div>
         <div className="step-row">

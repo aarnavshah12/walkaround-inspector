@@ -20,7 +20,6 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
   const [blobMissing, setBlobMissing] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [copied, setCopied] = useState(false);
   const uploadStartedRef = useRef(false);
   const uploadControllerRef = useRef<AbortController | null>(null);
 
@@ -193,9 +192,8 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           <p className="muted">Analysis starts automatically once the upload completes.</p>
         ) : record.upload.verified === false ? (
           <p className="muted">
-            Analysis skipped — the uploaded bytes don&apos;t match the
-            timestamped fingerprint, so findings couldn&apos;t be attributed
-            to the certified video.
+            Analysis skipped — the uploaded file doesn&apos;t match the
+            original video, so findings couldn&apos;t be attributed to it.
           </p>
         ) : record.analysis?.status === "failed" || record.analysis?.status === "unavailable" ? (
           <p className="muted" style={{ color: "var(--danger)" }}>
@@ -320,53 +318,12 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
       <section className="card">
         <div className="row">
-          <span className="section-label">Capture integrity</span>
+          <span className="section-label">Timeline</span>
           {record.tsa.status === "granted" ? (
-            <span className="badge ok">Timestamp certified</span>
+            <span className="badge ok">Time certified</span>
           ) : (
-            <span className="badge warn pulse">Timestamp pending</span>
+            <span className="badge warn pulse">Certifying time…</span>
           )}
-        </div>
-
-        <div className="stack-sm">
-          <span className="muted">Video fingerprint (SHA-256)</span>
-          <div className="hash-chip mono" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ flex: 1 }}>{record.hash}</span>
-            <button
-              onClick={() => {
-                void navigator.clipboard
-                  .writeText(record.hash)
-                  .then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1600);
-                  })
-                  .catch(() => {});
-              }}
-              aria-label={copied ? "Fingerprint copied" : "Copy fingerprint"}
-              title="Copy fingerprint"
-              style={{
-                appearance: "none",
-                background: "transparent",
-                border: "none",
-                color: copied ? "var(--ok)" : "var(--muted)",
-                cursor: "pointer",
-                padding: 2,
-                display: "inline-flex",
-                flex: "none",
-              }}
-            >
-              {copied ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="9" y="9" width="12" height="12" rx="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              )}
-            </button>
-          </div>
         </div>
 
         <dl>
@@ -374,13 +331,25 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             <dt>{record.source === "library" ? "Received" : "Recorded"}</dt>
             <dd>{new Date(record.clientTime).toLocaleString()}</dd>
           </div>
+          {record.tsa.grantedAt && (
+            <div className="kv">
+              <dt>Independently certified</dt>
+              <dd>{new Date(record.tsa.grantedAt).toLocaleString()}</dd>
+            </div>
+          )}
+          {record.analysis?.finishedAt && (
+            <div className="kv">
+              <dt>Analyzed</dt>
+              <dd>{new Date(record.analysis.finishedAt).toLocaleString()}</dd>
+            </div>
+          )}
         </dl>
 
         {up.status === "complete" ? (
           up.verified ? (
-            <span className="badge ok">Uploaded — bytes match the certified fingerprint</span>
+            <span className="badge ok">Upload verified</span>
           ) : (
-            <span className="badge danger">Uploaded, but hash mismatch — not verified</span>
+            <span className="badge danger">Upload doesn&apos;t match the original video</span>
           )
         ) : blobMissing ? (
           <p className="muted">

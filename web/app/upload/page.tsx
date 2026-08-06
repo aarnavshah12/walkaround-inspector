@@ -17,16 +17,16 @@ type Step = "idle" | "probing" | "hashing" | "registering" | "error";
 
 const SECURING_STEPS = [
   {
-    title: "Read",
+    title: "Check",
     detail: "Duration and resolution are checked so quality issues surface before you leave the lot.",
   },
   {
-    title: "Fingerprint",
-    detail: "A SHA-256 hash of the exact file is computed right here in your browser.",
+    title: "Secure",
+    detail: "The exact video is registered right here on your device.",
   },
   {
-    title: "Certify",
-    detail: "The fingerprint is timestamped by the server — before the upload even starts.",
+    title: "Timestamp",
+    detail: "The moment is certified by an independent authority — before the upload even starts.",
   },
 ] as const;
 
@@ -97,9 +97,9 @@ export default function UploadPage() {
           <span className="grad-text">We secure the rest.</span>
         </h1>
         <p className="lede">
-          Your walkaround is fingerprinted and timestamp-certified the moment
-          you choose it. Then it uploads in resumable chunks that survive bad
-          signal, and damage analysis starts on its own.
+          Your walkaround is timestamped the moment you choose it. Then it
+          uploads in resumable chunks that survive bad signal, and damage
+          analysis starts on its own.
         </p>
       </section>
 
@@ -139,7 +139,7 @@ export default function UploadPage() {
         ) : step === "probing" ? (
           "Reading video…"
         ) : step === "hashing" ? (
-          "Computing fingerprint…"
+          "Securing video…"
         ) : (
           "Certifying timestamp…"
         )}
