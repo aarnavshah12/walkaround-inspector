@@ -168,28 +168,48 @@ export async function layoutReportPdf(
   // ---- appendix ------------------------------------------------------------
   const appendix = doc.addPage(PAGE);
   y = header(ctx, appendix, "Evidence appendix");
-  y = line(ctx, appendix, y, "Video SHA-256", capture.hash, true);
-  y = line(ctx, appendix, y, "Client capture time", `${captureTimeIso} (UTC)`);
-  y = line(ctx, appendix, y, "Server receipt time", `${isoSeconds(capture.serverTime)} (UTC)`);
+  for (const t of [
+    "The long codes below look random by design — they are cryptographic evidence for",
+    "machines to check, not text to read. Anyone can verify them on the verifier page.",
+  ]) {
+    appendix.drawText(t, { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED });
+    y -= 13;
+  }
+  y -= 8;
+  appendix.drawText("Video fingerprint (SHA-256)", { x: MARGIN, y, size: 11, font: ctx.bold, color: TEXT });
+  y -= 15;
+  appendix.drawText(capture.hash, { x: MARGIN, y, size: 8, font: ctx.mono, color: TEXT });
+  y -= 14;
+  appendix.drawText(
+    "A unique fingerprint of the exact video file — changing a single frame changes this value.",
+    { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED }
+  );
+  y -= 22;
+  y = line(ctx, appendix, y, "Video captured", `${captureTimeIso} (UTC)`);
+  y = line(ctx, appendix, y, "Received by server", `${isoSeconds(capture.serverTime)} (UTC)`);
   if (captureTsr) {
     const parsed = parseTimeStampResp(captureTsr);
     if (parsed?.tstInfo) {
-      y -= 8;
-      appendix.drawText("Capture timestamp token (RFC 3161)", { x: MARGIN, y, size: 11, font: ctx.bold, color: TEXT });
-      y -= 18;
-      y = line(ctx, appendix, y, "Token time", `${parsed.tstInfo.genTime ?? "unparsed"} (UTC)`);
-      y = line(ctx, appendix, y, "Serial", parsed.tstInfo.serialHex, true);
-      y = line(ctx, appendix, y, "Policy OID", parsed.tstInfo.policyOid, true);
-      y = line(ctx, appendix, y, "Imprint (SHA-256)", parsed.tstInfo.hashedMessageHex, true);
+      y = line(ctx, appendix, y, "Independently certified", `${parsed.tstInfo.genTime ?? "unparsed"} (UTC)`);
+      y -= 6;
+      appendix.drawText(
+        "An independent timestamp authority certified the fingerprint at this time — proving the",
+        { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED }
+      );
+      y -= 13;
+      appendix.drawText(
+        "video existed, unmodified, no later than that moment.",
+        { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED }
+      );
+      y -= 13;
     }
   }
-  y -= 12;
+  y -= 8;
   for (const t of [
-    "The capture token proves the video's exact bytes existed no later than the token time.",
     capture.source === "library"
-      ? "This video was uploaded from a library, so the token proves receipt time, not filming time."
-      : "This video was recorded in-app; its fingerprint was timestamped at record-stop.",
-    "Verify independently at the verifier page, or with openssl using the embedded tokens.",
+      ? "This video was uploaded from a device library, so the certified time proves when it was"
+      : "This video was recorded in-app; its fingerprint was certified at the moment recording",
+    capture.source === "library" ? "received — not when it was filmed." : "stopped.",
   ]) {
     appendix.drawText(t, { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED });
     y -= 13;
@@ -199,10 +219,10 @@ export async function layoutReportPdf(
   const verify = doc.addPage(PAGE);
   y = header(ctx, verify, "Verification");
   for (const t of [
-    "This report is signed with ECDSA P-256. The signature covers every byte of this file",
-    "except three fixed windows (the QR pixels, the printed values below, and the machine",
-    "payload), whose contents are deterministically derived from the signed values — any",
-    "modification anywhere in the file invalidates verification.",
+    "This report is digitally signed: change anything in this file — a word, a photo, a single",
+    "byte — and verification fails. The codes below are that signature and its supporting",
+    "values. You never need to read them: scan the QR code or drop this PDF on the public",
+    "verifier page, and your device checks everything.",
   ]) {
     verify.drawText(t, { x: MARGIN, y, size: 9, font: ctx.font, color: MUTED });
     y -= 13;
@@ -320,9 +340,10 @@ async function drawFinding(ctx: Ctx, page: PDFPage, y: number, f: Finding, crops
   const title = f.assessment?.damage_type && f.assessment.damage_type !== "none" ? f.assessment.damage_type : f.class;
   page.drawText(`${f.id}: ${title}`, { x: tx, y: ty, size: 11, font: ctx.bold, color: TEXT });
   ty -= 15;
+  const visibleS = Math.max(0.1, (f.tracklet.last_pts_ms - f.tracklet.first_pts_ms) / 1000);
   const rows: string[] = [
-    `Detector confidence: ${f.confidence.max != null ? Math.round(f.confidence.max * 100) + "%" : "n/a"} · tracked ${f.tracklet.frames} frames`,
-    `Video time ${formatPts(f.best_frame.pts_ms)}${f.segment ? ` · ${f.segment.label}` : ""}${f.best_frame.wall_clock ? ` · ${isoSeconds(f.best_frame.wall_clock)}` : ""}`,
+    `Detector confidence ${f.confidence.max != null ? Math.round(f.confidence.max * 100) + "%" : "n/a"} · visible for ${visibleS.toFixed(1)} s`,
+    `At ${formatPts(f.best_frame.pts_ms)} in the video${f.segment ? ` · ${f.segment.label}` : ""}`,
   ];
   const a = f.assessment;
   if (a) {

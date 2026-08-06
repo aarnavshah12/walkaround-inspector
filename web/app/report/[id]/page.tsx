@@ -287,33 +287,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         )}
       </section>
 
-      {findings?.annotated && (
-        <section className="card">
-          <span className="section-label">Annotated walkaround</span>
-          <video
-            className="player"
-            controls
-            playsInline
-            preload="metadata"
-            src={`/api/capture/${id}/annotated`}
-          />
-          <p className="muted">Every detection the pipeline tracked, frame by frame.</p>
-          <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 14 }}>
-            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--danger)", flex: "none" }} />
-              Confirmed finding
-            </span>
-            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--warn)", flex: "none" }} />
-              AI-assessed false positive
-            </span>
-            <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--muted)", flex: "none" }} />
-              Rejected reflection / noise
-            </span>
-          </div>
-        </section>
-      )}
+      {/* Annotated review video still renders server-side (data/captures/
+          <id>/annotated.mp4, served at /api/capture/[id]/annotated) — player
+          removed from the UI per owner request 2026-08-06. */}
 
       {findings?.vehicle &&
         Object.values(findings.vehicle).some((v) => v && v !== "unknown" && v !== "unreadable") && (
