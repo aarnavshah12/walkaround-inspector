@@ -343,6 +343,18 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           </section>
         )}
 
+      {record.upload.verified === true &&
+        record.analysis?.status === "complete" &&
+        record.tsa.status === "granted" && (
+          <a href={`/api/capture/${id}/report`} className="btn btn-primary">
+            Download signed PDF report
+          </a>
+        )}
+      <p className="muted">
+        Anyone can check a downloaded report at the{" "}
+        <Link href="/verify">verifier page</Link> — no account needed.
+      </p>
+
       <Link href="/" className="btn btn-ghost">
         Home
       </Link>

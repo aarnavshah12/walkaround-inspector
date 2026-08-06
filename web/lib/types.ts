@@ -49,6 +49,8 @@ export interface CaptureRecord {
     finishedAt?: string;
     error?: string;
   };
+  /** Signed PDF report state (Phase 6). */
+  report?: { status: "ready"; generatedAt: string; digest: string };
   createdAt: string;
 }
 
