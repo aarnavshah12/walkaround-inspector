@@ -31,6 +31,15 @@ MIN_FLOW_POINTS = 8
 # Grayscale value above which a pixel counts as near-saturated (reflection vote).
 SATURATION_VALUE = 240
 
+# ---- enrichment (hosted Workflows A & B, Roboflow-managed Gemini key) -----
+ENRICHMENT_ENABLED = True
+WORKFLOW_A = "aarnavs-space/walkaround-enrich-a"
+WORKFLOW_B = "aarnavs-space/walkaround-vehicle-b"
+SERVERLESS_URL = "https://serverless.roboflow.com"
+# Vehicle-ID still comes from this fraction into the video (walkarounds open
+# with a whole-car framing).
+VEHICLE_ID_FRAME_FRAC = 0.05
+
 # ---- confirmation gate (runner, two-pass over the whole video) ------------
 # Tracklet must survive >= K sampled frames…
 K_MIN_FRAMES = 5

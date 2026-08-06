@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "inputs": [
+    { "type": "WorkflowImage", "name": "image" }
+  ],
+  "steps": [
+    {
+      "type": "roboflow_core/google_gemini@v4",
+      "name": "identifier",
+      "images": "$inputs.image",
+      "task_type": "structured-answering",
+      "output_structure": {
+        "make": "Vehicle manufacturer, e.g. 'Toyota', or 'unknown'",
+        "model": "Vehicle model, e.g. 'Corolla', or 'unknown'",
+        "body_style": "One of: sedan, hatchback, suv, crossover, pickup, van, wagon, coupe, convertible, unknown",
+        "color": "Primary exterior color",
+        "model_year_range": "Best-guess year range, e.g. '2019-2022', or 'unknown'",
+        "license_plate": "License plate text if readable, else 'unreadable'",
+        "fuel_door_side": "Which side the fuel door is on if visible: 'left', 'right', or 'unknown'"
+      },
+      "api_key": "rf_key:account",
+      "model_version": "gemini-3.5-flash"
+    },
+    {
+      "type": "roboflow_core/json_parser@v1",
+      "name": "parser",
+      "raw_json": "$steps.identifier.output",
+      "expected_fields": [
+        "make",
+        "model",
+        "body_style",
+        "color",
+        "model_year_range",
+        "license_plate",
+        "fuel_door_side"
+      ]
+    }
+  ],
+  "outputs": [
+    { "type": "JsonField", "name": "vehicle", "selector": "$steps.parser.*" },
+    { "type": "JsonField", "name": "raw", "selector": "$steps.identifier.output" }
+  ]
+}

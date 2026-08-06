@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "inputs": [
+    { "type": "WorkflowImage", "name": "image" }
+  ],
+  "steps": [
+    {
+      "type": "roboflow_core/google_gemini@v4",
+      "name": "assessor",
+      "images": "$inputs.image",
+      "task_type": "structured-answering",
+      "output_structure": {
+        "damage_type": "The damage visible in this crop from a rental-car walkaround video. One of: scratch, dent, glass-damage, paint_chip, dirt, missing-part, stain, none",
+        "sub_type": "Short specific description, e.g. 'clear-coat scratch', 'door ding', 'curb rash'",
+        "severity": "One of: minor, moderate, severe",
+        "approx_size_cm": "Approximate longest dimension in centimeters as a number, judged relative to visible car features (door handles ~10cm, wheels ~45cm)",
+        "affected_part": "The car part in view, e.g. 'front-left door', 'rear bumper', 'driver-side rear quarter panel'",
+        "paint_broken": "true or false — does the damage break through the paint to primer or metal",
+        "pre_existing_indicators": "Signs this is OLD damage (rust in the scratch, dirt accumulated in the dent, faded edges), or 'none'",
+        "is_false_positive": "true or false — true if this crop shows NO real damage: a reflection, glare, shadow, water drop, or sticker was mistaken for damage. Judge skeptically.",
+        "confidence_note": "One sentence on how confident this assessment is and why"
+      },
+      "api_key": "rf_key:account",
+      "model_version": "gemini-3.5-flash"
+    },
+    {
+      "type": "roboflow_core/json_parser@v1",
+      "name": "parser",
+      "raw_json": "$steps.assessor.output",
+      "expected_fields": [
+        "damage_type",
+        "sub_type",
+        "severity",
+        "approx_size_cm",
+        "affected_part",
+        "paint_broken",
+        "pre_existing_indicators",
+        "is_false_positive",
+        "confidence_note"
+      ]
+    }
+  ],
+  "outputs": [
+    { "type": "JsonField", "name": "assessment", "selector": "$steps.parser.*" },
+    { "type": "JsonField", "name": "raw", "selector": "$steps.assessor.output" }
+  ]
+}

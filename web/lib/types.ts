@@ -52,6 +52,29 @@ export interface CaptureRecord {
   createdAt: string;
 }
 
+export interface FindingAssessment {
+  damage_type?: string | null;
+  sub_type?: string | null;
+  severity?: string | null;
+  approx_size_cm?: number | string | null;
+  affected_part?: string | null;
+  paint_broken?: boolean | string | null;
+  pre_existing_indicators?: string | null;
+  is_false_positive?: boolean | string | null;
+  confidence_note?: string | null;
+  ai_assessed: true;
+}
+
+export interface VehicleId {
+  make?: string | null;
+  model?: string | null;
+  body_style?: string | null;
+  color?: string | null;
+  model_year_range?: string | null;
+  license_plate?: string | null;
+  fuel_door_side?: string | null;
+}
+
 export interface Finding {
   id: string;
   class: string;
@@ -73,12 +96,18 @@ export interface Finding {
   xyxy: number[];
   crop: string | null;
   full_frame: string | null;
+  assessment?: FindingAssessment;
+  /** AI judged this a false positive (reflection/glare/shadow); shown
+   * de-emphasized, never silently dropped. */
+  veto?: boolean;
 }
 
 export interface FindingsReport {
   capture_id: string | null;
   generated_at: string;
   sample_fps: number;
+  vehicle?: VehicleId | null;
+  enrichment?: { status: "complete" | "partial" | "skipped"; errors?: string[] };
   findings: Finding[];
   rejected: { reason: string; class: string; frames: number }[];
 }

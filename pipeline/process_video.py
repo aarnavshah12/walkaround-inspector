@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import config
+import enrich
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = REPO_ROOT / "workflows" / "workflow-v.json"
@@ -272,12 +273,39 @@ def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
             }
         )
 
+    # Enrichment (Workflows A & B, hosted, Roboflow-managed Gemini key).
+    # Gemini annotates or vetoes findings — it never adds them. Failures are
+    # non-fatal: findings ship un-enriched rather than not at all.
+    enrichment: dict = {"status": "skipped"}
+    vehicle = None
+    if config.ENRICHMENT_ENABLED and os.environ.get("ROBOFLOW_API_KEY"):
+        errors: list[str] = []
+        for finding in findings:
+            if not finding.get("crop"):
+                continue
+            try:
+                assessment = enrich.assess_finding(out_dir / finding["crop"])
+                if assessment:
+                    finding["assessment"] = {**assessment, "ai_assessed": True}
+                    if enrich.is_vetoed(assessment):
+                        finding["veto"] = True
+            except Exception as err:  # noqa: BLE001 — enrichment must not sink findings
+                errors.append(f"{finding['id']}: {err}")
+        try:
+            vehicle = enrich.identify_vehicle(video_path)
+        except Exception as err:  # noqa: BLE001
+            errors.append(f"vehicle: {err}")
+        enrichment = {"status": "complete" if not errors else "partial", "errors": errors}
+        print(f"enrichment: {enrichment['status']} ({len(errors)} errors), vehicle={'yes' if vehicle else 'no'}")
+
     out_dir.mkdir(parents=True, exist_ok=True)
     result = {
         "capture_id": capture["id"] if capture else None,
         "video": str(video_path),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sample_fps": config.SAMPLE_FPS,
+        "vehicle": vehicle,
+        "enrichment": enrichment,
         "gate": {
             "k_min_frames": config.K_MIN_FRAMES,
             "median_reproj_err_frac": config.MEDIAN_REPROJ_ERR_FRAC,

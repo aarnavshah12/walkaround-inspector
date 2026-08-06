@@ -255,7 +255,11 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         ) : (
           <>
             {findings.findings.map((f) => (
-              <div key={f.id} className="card" style={{ background: "var(--surface-2)" }}>
+              <div
+                key={f.id}
+                className="card"
+                style={{ background: "var(--surface-2)", opacity: f.veto ? 0.55 : 1 }}
+              >
                 {f.crop && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -265,11 +269,37 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
                   />
                 )}
                 <div className="row">
-                  <span className="badge danger">{f.class}</span>
+                  <span className={`badge ${f.veto ? "warn" : "danger"}`}>
+                    {f.assessment?.damage_type && f.assessment.damage_type !== "none"
+                      ? f.assessment.damage_type
+                      : f.class}
+                  </span>
                   <span className="muted">
                     {f.confidence.max !== null ? `${Math.round(f.confidence.max * 100)}% confidence` : ""}
                   </span>
                 </div>
+                {f.veto && (
+                  <p className="muted" style={{ color: "var(--warn)" }}>
+                    AI assessment: likely a false positive (reflection, glare,
+                    or shadow) — kept for transparency.
+                  </p>
+                )}
+                {f.assessment && !f.veto && (
+                  <p className="muted">
+                    <span className="badge">AI-assessed</span>{" "}
+                    {[
+                      f.assessment.severity,
+                      f.assessment.sub_type,
+                      f.assessment.affected_part,
+                      f.assessment.approx_size_cm ? `~${f.assessment.approx_size_cm} cm` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    {f.assessment.pre_existing_indicators &&
+                      f.assessment.pre_existing_indicators !== "none" &&
+                      ` · pre-existing signs: ${f.assessment.pre_existing_indicators}`}
+                  </p>
+                )}
                 <p className="muted">
                   Seen at {formatPts(f.best_frame.pts_ms)}
                   {f.segment ? ` · ${f.segment.label}` : ""} · tracked across{" "}
@@ -287,6 +317,31 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           </>
         )}
       </section>
+
+      {findings?.vehicle &&
+        Object.values(findings.vehicle).some((v) => v && v !== "unknown" && v !== "unreadable") && (
+          <section className="card">
+            <div className="row">
+              <h2>Vehicle</h2>
+              <span className="badge">AI-assessed</span>
+            </div>
+            <p className="muted">
+              {[
+                findings.vehicle.color,
+                findings.vehicle.make,
+                findings.vehicle.model,
+                findings.vehicle.model_year_range && findings.vehicle.model_year_range !== "unknown"
+                  ? `(${findings.vehicle.model_year_range})`
+                  : null,
+              ]
+                .filter((v) => v && v !== "unknown")
+                .join(" ")}
+              {findings.vehicle.license_plate &&
+                findings.vehicle.license_plate !== "unreadable" &&
+                ` · plate ${findings.vehicle.license_plate}`}
+            </p>
+          </section>
+        )}
 
       <Link href="/" className="btn btn-ghost">
         Home
