@@ -67,21 +67,40 @@ def capture_video_path(capture: dict) -> Path:
     return path
 
 
+def _shim_torch_mps() -> None:
+    """torch 2.13 removed torch.mps.current_device(), but torch's generic
+    device resolution (used via the trackers package) still calls it on
+    Apple Silicon. MPS only ever exposes device 0."""
+    try:
+        import torch
+
+        if torch.backends.mps.is_available() and not hasattr(torch.mps, "current_device"):
+            torch.mps.current_device = lambda: 0  # type: ignore[attr-defined]
+    except ImportError:
+        pass
+
+
 def collect_signals(video_path: Path) -> tuple[list[dict], float]:
     """First pass: run Workflow V over sampled frames, gather parallax
     signals per frame. Returns (signals, source_fps)."""
     import cv2
+
+    _shim_torch_mps()
     from inference import InferencePipeline
 
     probe = cv2.VideoCapture(str(video_path))
     source_fps = probe.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_count = probe.get(cv2.CAP_PROP_FRAME_COUNT) or 0
     probe.release()
 
     spec = json.loads(WORKFLOW_PATH.read_text())
 
     collected: list[dict] = []
+    frames_seen = 0
 
     def sink(predictions: dict, video_frame) -> None:
+        nonlocal frames_seen
+        frames_seen += 1
         signals = predictions.get("parallax_signals") or []
         frame_number = getattr(video_frame, "frame_id", None)
         for s in signals:
@@ -101,6 +120,15 @@ def collect_signals(video_path: Path) -> tuple[list[dict], float]:
     )
     pipeline.start()
     pipeline.join()
+
+    # A video with frames but zero successful workflow executions means every
+    # step errored (e.g. a broken model runtime) — that is a FAILED analysis,
+    # not an empty result. Never report "no damage" off the back of it.
+    if frame_count > 0 and frames_seen == 0:
+        raise RuntimeError(
+            "Workflow executed on 0 frames — every step errored; see the analysis log"
+        )
+    print(f"workflow executed on {frames_seen} sampled frames")
     return collected, source_fps
 
 
