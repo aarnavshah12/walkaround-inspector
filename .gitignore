@@ -3,6 +3,8 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
+.venv/
+__pycache__/
 
 # runtime data (captures, chunks, videos, TSA tokens)
 data/
