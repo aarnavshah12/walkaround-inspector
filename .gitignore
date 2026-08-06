@@ -20,5 +20,10 @@ PROGRESS.md
 walkaround-inspector-plan-final.md
 phase6-design.md
 
+# test footage — never commit video files
+*.mp4
+*.webm
+*.mov
+
 # os / editor
 .DS_Store
