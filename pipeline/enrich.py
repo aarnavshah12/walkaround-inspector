@@ -53,8 +53,12 @@ def _run_workflow(workflow_ref: str, jpg_bytes: bytes, output_key: str) -> dict 
 
 
 def assess_finding(crop_path: Path) -> dict | None:
-    """Workflow A: structured damage assessment for one finding crop."""
-    return _run_workflow(config.WORKFLOW_A, crop_path.read_bytes(), "assessment")
+    """Workflow A: structured damage assessment for one finding crop.
+    One retry — VLM output occasionally comes back malformed."""
+    data = crop_path.read_bytes()
+    return _run_workflow(config.WORKFLOW_A, data, "assessment") or _run_workflow(
+        config.WORKFLOW_A, data, "assessment"
+    )
 
 
 def identify_vehicle(video_path: Path) -> dict | None:

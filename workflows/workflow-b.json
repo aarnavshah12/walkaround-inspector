@@ -1,7 +1,10 @@
 {
   "version": "1.0",
   "inputs": [
-    { "type": "WorkflowImage", "name": "image" }
+    {
+      "type": "WorkflowImage",
+      "name": "image"
+    }
   ],
   "steps": [
     {
@@ -19,7 +22,9 @@
         "fuel_door_side": "Which side the fuel door is on if visible: 'left', 'right', or 'unknown'"
       },
       "api_key": "rf_key:account",
-      "model_version": "gemini-3.5-flash"
+      "model_version": "gemini-3.5-flash",
+      "max_tokens": 1024,
+      "thinking_level": "low"
     },
     {
       "type": "roboflow_core/json_parser@v1",
@@ -37,7 +42,15 @@
     }
   ],
   "outputs": [
-    { "type": "JsonField", "name": "vehicle", "selector": "$steps.parser.*" },
-    { "type": "JsonField", "name": "raw", "selector": "$steps.identifier.output" }
+    {
+      "type": "JsonField",
+      "name": "vehicle",
+      "selector": "$steps.parser.*"
+    },
+    {
+      "type": "JsonField",
+      "name": "raw",
+      "selector": "$steps.identifier.output"
+    }
   ]
 }
