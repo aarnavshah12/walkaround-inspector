@@ -14,6 +14,7 @@ import {
   fromB64url,
   hexToB64url,
   isoSeconds,
+  signatureMessage,
   type ReportSigInputs,
 } from "./sig-format";
 
@@ -135,6 +136,7 @@ export async function verifyReport(
     captureId: captureId!,
     videoHashHex: videoHashHex!,
     digestHex,
+    tsrDigestHex: digestHex,
     sigB64: "A".repeat(86),
     pubB64: pubB64!,
     captureTimeIso: captureTime!,
@@ -164,22 +166,27 @@ export async function verifyReport(
   const reportTsrHex = payloadMatch[2].toLowerCase();
   extracted.reportTsrHex = reportTsrHex;
   extracted.reportTime = payload.rt;
+  const tsrDigestHex = bytesToHex(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", hexToBytes(reportTsrHex) as BufferSource))
+  );
 
-  // 5. Payload consistency with the signed fields + computed digest.
+  // 5. Payload consistency with the signed fields + computed digests.
   const consistent =
     payload.cid === captureId &&
     payload.vh === hexToB64url(videoHashHex!) &&
     payload.pub === pubB64 &&
     payload.ct === captureTime &&
-    payload.dg === hexToB64url(digestHex);
+    payload.dg === hexToB64url(digestHex) &&
+    payload.th === hexToB64url(tsrDigestHex);
   checks.push({
     id: "consistency",
-    label: "Payload matches signed fields and recomputed digest",
+    label: "Payload matches signed fields and recomputed digests",
     pass: consistent,
     detail: consistent ? undefined : "The machine payload disagrees with the document contents — the file was modified.",
   });
 
-  // 6. ECDSA signature over every byte outside the windows.
+  // 6. ECDSA signature over digest‖SHA-256(report token) — covers every
+  // byte outside the windows AND the embedded timestamp token.
   let sigOk = false;
   try {
     const key = await crypto.subtle.importKey(
@@ -193,14 +200,14 @@ export async function verifyReport(
       { name: "ECDSA", hash: "SHA-256" },
       key,
       fromB64url(payload.sig) as BufferSource,
-      outside as BufferSource
+      signatureMessage(digestHex, tsrDigestHex) as BufferSource
     );
   } catch {
     sigOk = false;
   }
   checks.push({
     id: "signature",
-    label: "ECDSA P-256 signature over the document",
+    label: "ECDSA P-256 signature over the document and its timestamp token",
     pass: sigOk,
     detail: sigOk ? undefined : "Signature verification failed — the document does not match its signature.",
   });
@@ -256,6 +263,7 @@ export async function verifyReport(
       captureId: payload.cid,
       videoHashHex: videoHashHex!,
       digestHex,
+      tsrDigestHex,
       sigB64: payload.sig,
       pubB64: payload.pub,
       captureTimeIso: payload.ct,

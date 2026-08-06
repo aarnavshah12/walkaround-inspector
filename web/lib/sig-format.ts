@@ -36,6 +36,10 @@ export interface ReportSigInputs {
   captureId: string; // UUID, 36 chars
   videoHashHex: string; // 64 hex
   digestHex: string; // 64 hex — SHA-256 of the "outside" bytes
+  /** SHA-256 of the report's RFC 3161 token bytes, 64 hex. The ECDSA
+   * signature is computed over digest‖tsrDigest (64 raw bytes), binding the
+   * token — which lives inside a window — to the signature. */
+  tsrDigestHex: string;
   sigB64: string; // 86 chars
   pubB64: string; // 87 chars
   captureTimeIso: string; // 20 chars, seconds precision, Z
@@ -79,10 +83,19 @@ function validate(i: ReportSigInputs): void {
   assertLen("captureId", i.captureId, UUID_LEN);
   assertLen("videoHashHex", i.videoHashHex, HASH_HEX_LEN);
   assertLen("digestHex", i.digestHex, HASH_HEX_LEN);
+  assertLen("tsrDigestHex", i.tsrDigestHex, HASH_HEX_LEN);
   assertLen("sigB64", i.sigB64, SIG_B64_LEN);
   assertLen("pubB64", i.pubB64, PUB_B64_LEN);
   assertLen("captureTimeIso", i.captureTimeIso, ISO_SECONDS_LEN);
   assertLen("reportTimeIso", i.reportTimeIso, ISO_SECONDS_LEN);
+}
+
+/** The 64-byte message the ECDSA signature is computed over. */
+export function signatureMessage(digestHex: string, tsrDigestHex: string): Uint8Array {
+  const out = new Uint8Array(64);
+  for (let i = 0; i < 32; i++) out[i] = parseInt(digestHex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < 32; i++) out[32 + i] = parseInt(tsrDigestHex.slice(i * 2, i * 2 + 2), 16);
+  return out;
 }
 
 /** Canonical QR/payload JSON — fixed key order, fixed-width values, no
@@ -95,6 +108,7 @@ export function canonicalPayload(i: ReportSigInputs): string {
     `,"cid":"${i.captureId}"` +
     `,"vh":"${hexToB64url(i.videoHashHex)}"` +
     `,"dg":"${hexToB64url(i.digestHex)}"` +
+    `,"th":"${hexToB64url(i.tsrDigestHex)}"` +
     `,"sig":"${i.sigB64}"` +
     `,"pub":"${i.pubB64}"` +
     `,"ct":"${i.captureTimeIso}"` +
@@ -153,6 +167,7 @@ export function dummyInputs(): ReportSigInputs {
     captureId: "00000000-0000-4000-8000-000000000000",
     videoHashHex: "0".repeat(HASH_HEX_LEN),
     digestHex: "0".repeat(HASH_HEX_LEN),
+    tsrDigestHex: "0".repeat(HASH_HEX_LEN),
     sigB64: "A".repeat(SIG_B64_LEN),
     pubB64: "A".repeat(PUB_B64_LEN),
     captureTimeIso: "2026-01-01T00:00:00Z",

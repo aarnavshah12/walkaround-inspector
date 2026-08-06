@@ -25,6 +25,7 @@ import {
   dummyInputs,
   encodeWindows,
   isoSeconds,
+  signatureMessage,
   toB64url,
   type ReportSigInputs,
 } from "../sig-format";
@@ -119,10 +120,11 @@ async function generate(captureId: string): Promise<string> {
   const encoded = new TextEncoder().encode(encodeWindows(ranges));
   bytes.set(encoded, fieldIndex + fieldPattern.length);
 
-  // Sign everything outside the windows; timestamp the digest.
+  // Digest everything outside the windows, timestamp that digest, then sign
+  // digest‖SHA-256(token) — binding the token (which lives inside a window)
+  // to the signature without circularity.
   const outside = outsideBytes(bytes, ranges);
   const digestHex = createHash("sha256").update(outside).digest("hex");
-  const sigB64 = toB64url(await signBytes(outside));
 
   let token = await fetchTimestampToken(digestHex);
   if (!token.ok) token = await fetchTimestampToken(digestHex);
@@ -130,6 +132,8 @@ async function generate(captureId: string): Promise<string> {
     throw new TsaUnavailableError(token.error ?? "timestamp authority unreachable");
   }
   const tokenBytes = new Uint8Array(token.token);
+  const tsrDigestHex = createHash("sha256").update(tokenBytes).digest("hex");
+  const sigB64 = toB64url(await signBytes(signatureMessage(digestHex, tsrDigestHex)));
   const tstInfo = parseTimeStampResp(tokenBytes)?.tstInfo;
   const reportTimeIso = isoSeconds(tstInfo?.genTime ?? new Date().toISOString());
 
@@ -137,6 +141,7 @@ async function generate(captureId: string): Promise<string> {
     captureId,
     videoHashHex: capture.hash,
     digestHex,
+    tsrDigestHex,
     sigB64,
     pubB64: signer.publicKeyB64,
     captureTimeIso,
