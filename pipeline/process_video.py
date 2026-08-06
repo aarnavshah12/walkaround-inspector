@@ -23,6 +23,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import annotate
 import config
 import enrich
 
@@ -335,11 +336,29 @@ def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
         print(f"enrichment: {enrichment['status']} ({len(errors)} errors), vehicle={'yes' if vehicle else 'no'}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Additive: persist raw signals + render the annotated review video.
+    (out_dir / "signals.json").write_text(json.dumps(signals) + "\n")
+    statuses: dict[int, tuple[str, str]] = {
+        r["tracker_id"]: ("rejected", r["class"]) for r in rejected
+    }
+    for i, f in enumerate(confirmed, start=1):
+        label = f["class"]
+        statuses[f["tracker_id"]] = ("vetoed" if findings[i - 1].get("veto") else "confirmed", label)
+    annotated_ok = False
+    try:
+        annotated_ok = annotate.render_annotated(
+            video_path, signals, statuses, out_dir / "annotated.mp4"
+        )
+    except Exception as err:  # noqa: BLE001 — review video must never sink findings
+        print(f"annotated render failed: {err}")
+
     result = {
         "capture_id": capture["id"] if capture else None,
         "video": str(video_path),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sample_fps": config.SAMPLE_FPS,
+        "annotated": "annotated.mp4" if annotated_ok else None,
         "vehicle": vehicle,
         "enrichment": enrichment,
         "gate": {

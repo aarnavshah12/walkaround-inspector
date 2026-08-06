@@ -108,6 +108,8 @@ export interface FindingsReport {
   capture_id: string | null;
   generated_at: string;
   sample_fps: number;
+  /** Present when the runner rendered the annotated review video. */
+  annotated?: string | null;
   vehicle?: VehicleId | null;
   enrichment?: { status: "complete" | "partial" | "skipped"; errors?: string[] };
   findings: Finding[];

@@ -318,6 +318,24 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         )}
       </section>
 
+      {findings?.annotated && (
+        <section className="card">
+          <h2>Annotated walkaround</h2>
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            src={`/api/capture/${id}/annotated`}
+            style={{ width: "100%", borderRadius: 8, background: "#000" }}
+          />
+          <p className="muted">
+            Every detection the pipeline tracked: red = confirmed finding,
+            amber = AI-assessed false positive, gray = rejected as
+            reflection/noise.
+          </p>
+        </section>
+      )}
+
       {findings?.vehicle &&
         Object.values(findings.vehicle).some((v) => v && v !== "unknown" && v !== "unreadable") && (
           <section className="card">
