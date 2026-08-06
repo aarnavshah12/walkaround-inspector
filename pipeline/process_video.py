@@ -37,6 +37,27 @@ def load_capture(capture_id: str) -> dict:
     return json.loads(path.read_text())
 
 
+def update_capture_analysis(capture_id: str, status: str, error: str | None = None) -> None:
+    """Mirror analysis progress into the capture record the web API serves."""
+    path = DATA_DIR / "captures" / f"{capture_id}.json"
+    if not path.exists():
+        return
+    rec = json.loads(path.read_text())
+    analysis = rec.get("analysis") or {}
+    analysis["status"] = status
+    now = datetime.now(timezone.utc).isoformat()
+    if status == "running":
+        analysis["startedAt"] = now
+    if status in ("complete", "failed"):
+        analysis["finishedAt"] = now
+    if error:
+        analysis["error"] = error
+    rec["analysis"] = analysis
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(rec, indent=2))
+    tmp.replace(path)
+
+
 def capture_video_path(capture: dict) -> Path:
     ext = "mp4" if "mp4" in capture.get("mime", "") else "webm"
     path = DATA_DIR / "videos" / f"{capture['id']}.{ext}"
@@ -201,6 +222,19 @@ def main() -> None:
         else video_path.parent / (video_path.stem + "-findings")
     )
 
+    if capture:
+        update_capture_analysis(capture["id"], "running")
+    try:
+        run(capture, video_path, out_dir)
+    except Exception as err:
+        if capture:
+            update_capture_analysis(capture["id"], "failed", error=str(err))
+        raise
+    if capture:
+        update_capture_analysis(capture["id"], "complete")
+
+
+def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
     print(f"workflow: {WORKFLOW_PATH.name} | video: {video_path} | sample {config.SAMPLE_FPS} fps")
     signals, source_fps = collect_signals(video_path)
     print(f"collected {len(signals)} per-frame signals (source {source_fps:.1f} fps)")

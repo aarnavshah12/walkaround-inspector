@@ -1,7 +1,9 @@
 "use client";
 
-// Home: start a walkaround, resume interrupted uploads, or (secondary path)
-// upload an existing video from the library.
+// Home: upload-and-go. Pick a walkaround video; fingerprinting,
+// timestamping, upload, and damage analysis all happen automatically.
+// (The in-app guided recording flow still exists at /record but is hidden
+// from the UI for now — owner decision 2026-08-05.)
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,15 +39,19 @@ export default function HomePage() {
       <div>
         <h1>Walkaround Inspector</h1>
         <p className="muted" style={{ marginTop: 6 }}>
-          Record a slow lap of the car before you drive off. The video&apos;s
-          fingerprint is timestamped the moment you stop recording — proof of
-          its condition, even if the report comes later.
+          Upload a slow walkaround video of the car. We fingerprint and
+          timestamp it the moment you pick it, then find scratches, dents,
+          and stains automatically — reflections filtered out.
         </p>
       </div>
 
-      <Link href="/record" className="btn btn-primary">
-        Start walkaround
+      <Link href="/upload" className="btn btn-primary">
+        Upload walkaround video
       </Link>
+      <p className="muted">
+        Tip: upload before you drive off — the certified timestamp proves the
+        video existed right then.
+      </p>
 
       {pending.length > 0 && (
         <section className="card">
@@ -80,21 +86,9 @@ export default function HomePage() {
         </section>
       )}
 
-      <section className="card">
-        <h2>Already have a video?</h2>
-        <p className="muted">
-          You can upload one from your library, but its timestamp will prove
-          when we <em>received</em> it — not when it was filmed. Recording in
-          the app is the strong evidence.
-        </p>
-        <Link href="/upload" className="btn btn-ghost">
-          Upload from library
-        </Link>
-      </section>
-
       <p className="muted" style={{ marginTop: "auto" }}>
-        Tip: add this app to your home screen so it&apos;s one tap away at the
-        rental lot. Recording works offline — uploads wait for signal.
+        Add this app to your home screen so it&apos;s one tap away at the
+        rental lot.
       </p>
     </main>
   );

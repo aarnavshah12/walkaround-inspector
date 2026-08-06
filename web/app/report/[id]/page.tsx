@@ -8,13 +8,14 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { CaptureRecord } from "../../../lib/types";
+import type { CaptureRecord, FindingsReport } from "../../../lib/types";
 import { deletePendingVideo, getPendingVideo } from "../../../lib/blob-store";
 import { uploadCapture } from "../../../lib/upload-client";
 
 export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [record, setRecord] = useState<CaptureRecord | null>(null);
+  const [findings, setFindings] = useState<FindingsReport | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
   const [blobMissing, setBlobMissing] = useState(false);
@@ -43,21 +44,35 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
     }
   }, [id]);
 
-  // Poll while anything is still settling (TSA pending or upload running).
+  // Poll while anything is still settling: TSA pending, upload running, or
+  // analysis not yet in a terminal state (verified uploads auto-analyze).
   useEffect(() => {
     void refresh();
     const t = setInterval(() => {
       setRecord((current) => {
+        const analysisSettled =
+          current?.upload.verified !== true ||
+          ["complete", "failed", "unavailable"].includes(current.analysis?.status ?? "");
         const settled =
           current &&
           current.tsa.status === "granted" &&
-          current.upload.status === "complete";
+          current.upload.status === "complete" &&
+          analysisSettled;
         if (!settled) void refresh();
         return current;
       });
     }, 3000);
     return () => clearInterval(t);
   }, [refresh]);
+
+  // Fetch findings once analysis reports complete.
+  useEffect(() => {
+    if (record?.analysis?.status !== "complete" || findings) return;
+    void fetch(`/api/capture/${id}/findings`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setFindings(data))
+      .catch(() => {});
+  }, [record?.analysis?.status, findings, id]);
 
   // Auto-start/resume the upload once, when we know it's incomplete and the
   // blob is on this device. (Ref guard: React strict mode double-runs
@@ -127,7 +142,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       <div className="row">
         <h1>Inspection report</h1>
         {record.source === "library" ? (
-          <span className="badge warn">Library upload</span>
+          <span className="badge">Uploaded video</span>
         ) : (
           <span className="badge ok">Recorded in app</span>
         )}
@@ -208,11 +223,69 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
       <section className="card">
         <h2>Findings</h2>
-        <p className="muted">
-          Damage analysis runs after upload completes — detections, reflection
-          filtering, and the signed PDF land here automatically. (Pipeline
-          arrives in the next build phase.)
-        </p>
+        {record.upload.status !== "complete" ? (
+          <p className="muted">Analysis starts automatically once the upload completes.</p>
+        ) : record.upload.verified === false ? (
+          <p className="muted">
+            Analysis skipped — the uploaded bytes don&apos;t match the
+            timestamped fingerprint, so findings couldn&apos;t be attributed
+            to the certified video.
+          </p>
+        ) : record.analysis?.status === "failed" || record.analysis?.status === "unavailable" ? (
+          <p style={{ color: "var(--danger)" }}>
+            Analysis {record.analysis.status === "failed" ? "failed" : "couldn't start"}
+            {record.analysis.error ? ` — ${record.analysis.error}` : ""}.
+          </p>
+        ) : record.analysis?.status !== "complete" ? (
+          <p className="muted">
+            Analyzing the video — detecting damage and filtering out
+            reflections. This page updates automatically.
+          </p>
+        ) : !findings ? (
+          <p className="muted">Loading findings…</p>
+        ) : findings.findings.length === 0 ? (
+          <>
+            <span className="badge ok">✓ No damage found</span>
+            <p className="muted">
+              No confirmed damage in this walkaround.
+              {findings.rejected.length > 0 &&
+                ` ${findings.rejected.length} candidate detection${findings.rejected.length === 1 ? "" : "s"} rejected as reflections, glare, or noise.`}
+            </p>
+          </>
+        ) : (
+          <>
+            {findings.findings.map((f) => (
+              <div key={f.id} className="card" style={{ background: "var(--surface-2)" }}>
+                {f.crop && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={f.crop}
+                    alt={`${f.class} crop`}
+                    style={{ borderRadius: 8, maxWidth: "100%" }}
+                  />
+                )}
+                <div className="row">
+                  <span className="badge danger">{f.class}</span>
+                  <span className="muted">
+                    {f.confidence.max !== null ? `${Math.round(f.confidence.max * 100)}% confidence` : ""}
+                  </span>
+                </div>
+                <p className="muted">
+                  Seen at {formatPts(f.best_frame.pts_ms)}
+                  {f.segment ? ` · ${f.segment.label}` : ""} · tracked across{" "}
+                  {f.tracklet.frames} frames
+                </p>
+              </div>
+            ))}
+            {findings.rejected.length > 0 && (
+              <p className="muted">
+                {findings.rejected.length} additional candidate
+                {findings.rejected.length === 1 ? "" : "s"} rejected as
+                reflections, glare, or noise.
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       <Link href="/" className="btn btn-ghost">
@@ -220,4 +293,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       </Link>
     </main>
   );
+}
+
+function formatPts(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }

@@ -1,12 +1,13 @@
 "use client";
 
-// Secondary path: upload an existing video from the library. Labeled
-// `source: library` end-to-end — its timestamp proves when we RECEIVED the
-// video, not when it was filmed. In-app recording is the advertised habit.
+// Primary flow (upload-and-go): pick a walkaround video → probe + sanity
+// warnings → SHA-256 in browser → immediate hash-timestamp POST (tiny,
+// lands before the big transfer) → report page handles the resumable upload
+// and automatic analysis. `source: library` is recorded end-to-end; the
+// timestamp honestly proves receipt time.
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { sha256Hex } from "../../lib/hash";
 import { savePendingVideo } from "../../lib/blob-store";
 import { registerCapture } from "../../lib/capture-client";
@@ -14,7 +15,7 @@ import { MIN_HEIGHT_PX, MIN_WALKAROUND_MS } from "../../lib/coach";
 
 type Step = "idle" | "probing" | "hashing" | "registering" | "error";
 
-export default function LibraryUploadPage() {
+export default function UploadPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>("idle");
@@ -54,6 +55,7 @@ export default function LibraryUploadPage() {
         size: file.size,
         createdAt: record.createdAt,
         source: "library",
+        registered: true,
       });
 
       router.push(`/report/${record.id}`);
@@ -67,17 +69,14 @@ export default function LibraryUploadPage() {
 
   return (
     <main className="container">
-      <h1>Upload existing video</h1>
+      <h1>New inspection</h1>
 
-      <section className="card">
-        <span className="badge warn">Library upload — weaker evidence</span>
-        <p className="muted">
-          A video from your library gets timestamped when we <em>receive</em>{" "}
-          it, which proves the video existed now — not that it was filmed at
-          pickup. For proof tied to the moment you took the car,{" "}
-          <Link href="/record">record in the app</Link> instead.
-        </p>
-      </section>
+      <p className="muted">
+        Pick your walkaround video. Everything after that is automatic:
+        it&apos;s fingerprinted (SHA-256) and timestamp-certified before the
+        upload even starts, uploads in resumable chunks that survive bad
+        signal, and damage analysis begins the moment the upload lands.
+      </p>
 
       <input
         ref={inputRef}
@@ -96,8 +95,13 @@ export default function LibraryUploadPage() {
             ? "Reading video…"
             : step === "hashing"
               ? "Computing fingerprint…"
-              : "Timestamping…"}
+              : "Certifying timestamp…"}
       </button>
+
+      <p className="muted">
+        The certified timestamp proves this exact video existed when you
+        uploaded it — so upload before you drive off.
+      </p>
 
       {step === "error" && (
         <p style={{ color: "var(--danger)" }}>Could not process the video: {errorMsg}</p>

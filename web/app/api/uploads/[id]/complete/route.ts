@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidCaptureId, readCapture, updateCapture } from "../../../../../lib/server/store";
 import { assembleVideo, deleteChunks, listReceivedChunks } from "../../../../../lib/server/storage";
+import { triggerAnalysis } from "../../../../../lib/server/analysis";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function POST(
   const verified = assembled.sha256 === capture.hash;
   await deleteChunks(id);
 
-  const updated = await updateCapture(id, (r) => ({
+  let updated = await updateCapture(id, (r) => ({
     ...r,
     sizeBytes: assembled.size,
     upload: {
@@ -52,6 +53,14 @@ export async function POST(
       completedAt: new Date().toISOString(),
     },
   }));
+
+  // Upload-and-go: a verified upload starts Workflow V with no further user
+  // action. Unverified videos are NOT analyzed — the bytes don't match the
+  // timestamped hash, so any findings would be unattributable.
+  if (verified) {
+    await triggerAnalysis(id);
+    updated = (await readCapture(id)) ?? updated;
+  }
 
   return NextResponse.json(updated);
 }

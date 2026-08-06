@@ -41,7 +41,46 @@ export interface CaptureRecord {
     verified?: boolean;
     completedAt?: string;
   };
+  /** Workflow V run state; written by the API on trigger and by the Python
+   * runner as it progresses. Absent until an upload completes verified. */
+  analysis?: {
+    status: "queued" | "running" | "complete" | "failed" | "unavailable";
+    startedAt?: string;
+    finishedAt?: string;
+    error?: string;
+  };
   createdAt: string;
+}
+
+export interface Finding {
+  id: string;
+  class: string;
+  confidence: { mean: number | null; max: number | null };
+  tracklet: {
+    tracker_id: number;
+    frames: number;
+    first_pts_ms: number;
+    last_pts_ms: number;
+    median_residual_frac: number | null;
+    median_saturation: number | null;
+  };
+  best_frame: {
+    frame_number: number | null;
+    pts_ms: number;
+    wall_clock: string | null;
+  };
+  segment: { id: string; label: string } | null;
+  xyxy: number[];
+  crop: string | null;
+  full_frame: string | null;
+}
+
+export interface FindingsReport {
+  capture_id: string | null;
+  generated_at: string;
+  sample_fps: number;
+  findings: Finding[];
+  rejected: { reason: string; class: string; frames: number }[];
 }
 
 export interface CaptureCreateRequest {
