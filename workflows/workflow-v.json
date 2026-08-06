@@ -21,7 +21,7 @@
       "type": "DynamicBlockDefinition",
       "manifest": {
         "type": "ManifestDescription",
-        "block_type": "parallax_filter",
+        "block_type": "ParallaxFilter",
         "description": "Temporal parallax filter: rejects reflections by comparing tracked-box motion against local background motion (LK flow + RANSAC homography). Emits per-frame signals; the runner applies the tracklet confirmation gate.",
         "inputs": {
           "image": {
@@ -103,7 +103,7 @@
       "high_conf_det_threshold": 0.4
     },
     {
-      "type": "parallax_filter",
+      "type": "ParallaxFilter",
       "name": "parallax",
       "image": "$inputs.image",
       "detections": "$steps.tracker.tracked_detections",

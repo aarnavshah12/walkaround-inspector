@@ -1,1 +1,3 @@
-inference>=0.30
+# Python 3.10+ required — on 3.9 pip silently resolves inference 1.0.x,
+# whose workflow engine predates the current dynamic-block format.
+inference>=1.3

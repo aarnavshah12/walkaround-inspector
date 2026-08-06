@@ -41,7 +41,7 @@ def build() -> dict:
                 "type": "DynamicBlockDefinition",
                 "manifest": {
                     "type": "ManifestDescription",
-                    "block_type": "parallax_filter",
+                    "block_type": "ParallaxFilter",
                     "description": (
                         "Temporal parallax filter: rejects reflections by "
                         "comparing tracked-box motion against local "
@@ -113,7 +113,7 @@ def build() -> dict:
                 "high_conf_det_threshold": config.TRACK_HIGH_CONF_THRESHOLD,
             },
             {
-                "type": "parallax_filter",
+                "type": "ParallaxFilter",
                 "name": "parallax",
                 "image": "$inputs.image",
                 "detections": "$steps.tracker.tracked_detections",
