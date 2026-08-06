@@ -47,7 +47,8 @@ def _run_workflow(workflow_ref: str, jpg_bytes: bytes, output_key: str) -> dict 
         try:
             return json.loads(raw.strip().strip("`").removeprefix("json"))
         except (json.JSONDecodeError, AttributeError):
-            return None
+            pass
+    print(f"enrichment: {workflow_ref} returned unparseable output: {str(raw)[:200]!r}")
     return None
 
 

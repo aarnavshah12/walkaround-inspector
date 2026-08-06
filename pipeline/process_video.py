@@ -80,7 +80,7 @@ def _shim_torch_mps() -> None:
         pass
 
 
-def collect_signals(video_path: Path) -> tuple[list[dict], float]:
+def collect_signals(video_path: Path) -> tuple[list[dict], float, float]:
     """First pass: run Workflow V over sampled frames, gather parallax
     signals per frame. Returns (signals, source_fps)."""
     import cv2
@@ -128,13 +128,18 @@ def collect_signals(video_path: Path) -> tuple[list[dict], float]:
         raise RuntimeError(
             "Workflow executed on 0 frames — every step errored; see the analysis log"
         )
-    print(f"workflow executed on {frames_seen} sampled frames")
-    return collected, source_fps
+    duration_s = frame_count / source_fps if source_fps else 0
+    effective_fps = frames_seen / duration_s if duration_s else float(config.SAMPLE_FPS)
+    print(f"workflow executed on {frames_seen} frames ({effective_fps:.1f} effective fps)")
+    return collected, source_fps, effective_fps
 
 
-def confirm_tracklets(signals: list[dict], source_fps: float) -> tuple[list[dict], list[dict]]:
+def confirm_tracklets(
+    signals: list[dict], source_fps: float, effective_fps: float
+) -> tuple[list[dict], list[dict]]:
     """Second pass: group signals into tracklets and apply the gate from
     config.py. Returns (confirmed, rejected) tracklet summaries."""
+    min_frames = max(3, round(config.MIN_TRACKLET_SECONDS * effective_fps))
     tracklets: dict[int, list[dict]] = {}
     for s in signals:
         tid = s.get("tracker_id")
@@ -163,8 +168,11 @@ def confirm_tracklets(signals: list[dict], source_fps: float) -> tuple[list[dict
         }
 
         reason = None
-        if len(entries) < config.K_MIN_FRAMES:
-            reason = f"tracklet too short ({len(entries)} < {config.K_MIN_FRAMES} frames)"
+        if len(entries) < min_frames:
+            reason = (
+                f"tracklet too short ({len(entries)} < {min_frames} frames "
+                f"≈ {config.MIN_TRACKLET_SECONDS} s at {effective_fps:.1f} fps)"
+            )
         elif not residuals:
             reason = "insufficient optical flow to verify against parallax"
         elif stats["median_residual_frac"] >= config.MEDIAN_REPROJ_ERR_FRAC:
@@ -265,10 +273,10 @@ def main() -> None:
 
 def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
     print(f"workflow: {WORKFLOW_PATH.name} | video: {video_path} | sample {config.SAMPLE_FPS} fps")
-    signals, source_fps = collect_signals(video_path)
+    signals, source_fps, effective_fps = collect_signals(video_path)
     print(f"collected {len(signals)} per-frame signals (source {source_fps:.1f} fps)")
 
-    confirmed, rejected = confirm_tracklets(signals, source_fps)
+    confirmed, rejected = confirm_tracklets(signals, source_fps, effective_fps)
     extract_crops(video_path, confirmed, out_dir / "crops")
 
     findings = []
@@ -335,7 +343,7 @@ def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
         "vehicle": vehicle,
         "enrichment": enrichment,
         "gate": {
-            "k_min_frames": config.K_MIN_FRAMES,
+            "min_tracklet_seconds": config.MIN_TRACKLET_SECONDS,
             "median_reproj_err_frac": config.MEDIAN_REPROJ_ERR_FRAC,
             "mean_conf_min": config.MEAN_CONF_MIN,
             "saturation_ratio_max": config.SATURATION_RATIO_MAX,

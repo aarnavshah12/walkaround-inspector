@@ -41,11 +41,17 @@ SERVERLESS_URL = "https://serverless.roboflow.com"
 VEHICLE_ID_FRAME_FRAC = 0.05
 
 # ---- confirmation gate (runner, two-pass over the whole video) ------------
-# Tracklet must survive >= K sampled frames…
-K_MIN_FRAMES = 5
+# Tuned 2026-08-05 against owner-provided real walkaround footage
+# (clip xYIUS2I9j84 1:03–1:13): real damage tracklets persisted 1–1.75 s and
+# passed the parallax test but carried mean confidences 0.33–0.42, so the
+# plan's starting MEAN_CONF_MIN=0.5 rejected all of them. Persistence is
+# time-based (not frame-count) because the engine's effective processed fps
+# varies by source.
+# Tracklet must persist at least this long…
+MIN_TRACKLET_SECONDS = 1.0
 # …with median reprojection error under this fraction of the frame diagonal…
 MEDIAN_REPROJ_ERR_FRAC = 0.015
 # …mean detection confidence at least…
-MEAN_CONF_MIN = 0.5
+MEAN_CONF_MIN = 0.3
 # …and not look like pure glare: median near-saturated pixel ratio below.
 SATURATION_RATIO_MAX = 0.5
