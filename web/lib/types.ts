@@ -47,6 +47,9 @@ export interface CaptureRecord {
     status: "queued" | "running" | "complete" | "failed" | "unavailable";
     startedAt?: string;
     finishedAt?: string;
+    /** 0..1, written by the runner as frames are processed. */
+    progress?: number;
+    stage?: string;
     error?: string;
   };
   /** Signed PDF report state (Phase 6). */

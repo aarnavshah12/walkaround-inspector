@@ -237,10 +237,19 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             {record.analysis.error ? ` — ${record.analysis.error}` : ""}.
           </p>
         ) : record.analysis?.status !== "complete" ? (
-          <p className="muted">
-            Analyzing the video — detecting damage and filtering out
-            reflections. This page updates automatically.
-          </p>
+          <>
+            <div className="progress-track">
+              <div
+                className="progress-fill"
+                style={{ width: `${Math.round((record.analysis?.progress ?? 0) * 100)}%` }}
+              />
+            </div>
+            <p className="muted">
+              {record.analysis?.stage ?? "Starting analysis"} —{" "}
+              {Math.round((record.analysis?.progress ?? 0) * 100)}%
+              {analysisEta(record.analysis)}. This page updates automatically.
+            </p>
+          </>
         ) : !findings ? (
           <p className="muted">Loading findings…</p>
         ) : findings.findings.length === 0 ? (
@@ -383,4 +392,15 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 function formatPts(ms: number): string {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** " · ~40 s left" estimated from elapsed time vs progress; empty until
+ * there's enough signal to extrapolate honestly. */
+function analysisEta(analysis?: CaptureRecord["analysis"]): string {
+  if (!analysis?.startedAt || !analysis.progress || analysis.progress < 0.05) return "";
+  const elapsed = (Date.now() - Date.parse(analysis.startedAt)) / 1000;
+  if (elapsed < 5) return "";
+  const remaining = Math.round((elapsed * (1 - analysis.progress)) / analysis.progress);
+  if (remaining < 3) return "";
+  return remaining < 90 ? ` · ~${remaining} s left` : ` · ~${Math.round(remaining / 60)} min left`;
 }

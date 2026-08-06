@@ -39,7 +39,13 @@ def load_capture(capture_id: str) -> dict:
     return json.loads(path.read_text())
 
 
-def update_capture_analysis(capture_id: str, status: str, error: str | None = None) -> None:
+def update_capture_analysis(
+    capture_id: str,
+    status: str,
+    error: str | None = None,
+    progress: float | None = None,
+    stage: str | None = None,
+) -> None:
     """Mirror analysis progress into the capture record the web API serves."""
     path = DATA_DIR / "captures" / f"{capture_id}.json"
     if not path.exists():
@@ -48,10 +54,15 @@ def update_capture_analysis(capture_id: str, status: str, error: str | None = No
     analysis = rec.get("analysis") or {}
     analysis["status"] = status
     now = datetime.now(timezone.utc).isoformat()
-    if status == "running":
+    if status == "running" and not analysis.get("startedAt"):
         analysis["startedAt"] = now
     if status in ("complete", "failed"):
         analysis["finishedAt"] = now
+        analysis["progress"] = 1.0
+    if progress is not None:
+        analysis["progress"] = round(progress, 3)
+    if stage is not None:
+        analysis["stage"] = stage
     if error:
         analysis["error"] = error
     rec["analysis"] = analysis
@@ -81,7 +92,9 @@ def _shim_torch_mps() -> None:
         pass
 
 
-def collect_signals(video_path: Path) -> tuple[list[dict], float, float]:
+def collect_signals(
+    video_path: Path, on_progress=None
+) -> tuple[list[dict], float, float]:
     """First pass: run Workflow V over sampled frames, gather parallax
     signals per frame. Returns (signals, source_fps)."""
     import cv2
@@ -102,6 +115,8 @@ def collect_signals(video_path: Path) -> tuple[list[dict], float, float]:
     def sink(predictions: dict, video_frame) -> None:
         nonlocal frames_seen
         frames_seen += 1
+        if on_progress and frame_count and frames_seen % 10 == 0:
+            on_progress(frames_seen, frame_count)
         signals = predictions.get("parallax_signals") or []
         frame_number = getattr(video_frame, "frame_id", None)
         for s in signals:
@@ -274,10 +289,24 @@ def main() -> None:
 
 def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
     print(f"workflow: {WORKFLOW_PATH.name} | video: {video_path} | sample {config.SAMPLE_FPS} fps")
-    signals, source_fps, effective_fps = collect_signals(video_path)
+    # Detection over frames is ~80% of wall-clock; enrichment and the
+    # annotated render split the rest. Progress lands in the capture record
+    # so the report page can draw a real bar.
+    def frame_progress(done: int, total: int) -> None:
+        if capture:
+            update_capture_analysis(
+                capture["id"], "running",
+                progress=0.8 * done / total, stage="Detecting & tracking damage",
+            )
+
+    signals, source_fps, effective_fps = collect_signals(video_path, frame_progress)
     print(f"collected {len(signals)} per-frame signals (source {source_fps:.1f} fps)")
 
     confirmed, rejected = confirm_tracklets(signals, source_fps, effective_fps)
+    if capture:
+        update_capture_analysis(
+            capture["id"], "running", progress=0.82, stage="AI assessment & vehicle ID"
+        )
     extract_crops(video_path, confirmed, out_dir / "crops")
 
     findings = []
@@ -336,6 +365,10 @@ def run(capture: dict | None, video_path: Path, out_dir: Path) -> None:
         print(f"enrichment: {enrichment['status']} ({len(errors)} errors), vehicle={'yes' if vehicle else 'no'}")
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    if capture:
+        update_capture_analysis(
+            capture["id"], "running", progress=0.92, stage="Rendering annotated video"
+        )
 
     # Additive: persist raw signals + render the annotated review video.
     (out_dir / "signals.json").write_text(json.dumps(signals) + "\n")
