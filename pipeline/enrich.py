@@ -77,7 +77,10 @@ def identify_vehicle(video_path: Path) -> dict | None:
     ok, jpg = cv2.imencode(".jpg", frame)
     if not ok:
         return None
-    return _run_workflow(config.WORKFLOW_B, jpg.tobytes(), "vehicle")
+    data = jpg.tobytes()
+    return _run_workflow(config.WORKFLOW_B, data, "vehicle") or _run_workflow(
+        config.WORKFLOW_B, data, "vehicle"
+    )
 
 
 def is_vetoed(assessment: dict) -> bool:
